@@ -1,0 +1,99 @@
+#!/bin/sh
+set -e
+
+# Move /etc, /var, and /opt to /usr/share/factory
+mkdir -p "$BUILDROOT/usr/share/factory"
+for d in etc var opt; do
+    [ ! -d "$BUILDROOT/$d" ] && continue
+    cp -a "$BUILDROOT/$d" "$BUILDROOT/usr/share/factory/"
+done
+
+# # Find the loader entry created by packages
+# LOADER_ENTRY=$(find "$BUILDROOT/boot/loader/entries" -name "*.conf" | head -1)
+
+# if [ -f "$LOADER_ENTRY" ]; then
+#     # Extract cmdline from options line
+#     CMDLINE=$(grep "^options" "$LOADER_ENTRY" | sed 's/^options[[:space:]]*//')
+    
+#     # Save it for mkosi to use
+#     echo "$CMDLINE" > "$BUILDROOT/etc/kernel/cmdline"
+    
+#     # Remove the package-created entry
+#     rm -f "$LOADER_ENTRY"
+# fi
+
+# Reorganize boot artifacts for ESP layout
+if [ -d "$BUILDROOT/boot" ]; then
+    VERSION="${IMAGE_VERSION:-unknown}"
+
+    # Create target directories
+    mkdir -p "$BUILDROOT/boot/pmos/$VERSION"
+
+    # Move kernel artifacts to versioned directory
+    for kernel in "$BUILDROOT/boot"/vmlinuz*; do
+        [ -f "$kernel" ] && mv "$kernel" "$BUILDROOT/boot/pmos/$VERSION/"
+    done
+
+    # Handle other specific files
+    for f in linux.efi initramfs initramfs-extra intel-ucode.img amd-ucode.img; do
+        [ -e "$BUILDROOT/boot/$f" ] && mv "$BUILDROOT/boot/$f" "$BUILDROOT/boot/pmos/$VERSION/"
+    done
+
+    # Move entire dtbs directory structure to versioned directory
+    for dtbs_dir in "$BUILDROOT/boot"/dtbs*; do
+        [ -d "$dtbs_dir" ] && mv "$dtbs_dir" "$BUILDROOT/boot/pmos/$VERSION/"
+    done
+
+    # Also check for loose DTB files at boot root and move them
+    find "$BUILDROOT/boot" -maxdepth 1 -name "*.dtb" -type f -exec mv {} "$BUILDROOT/boot/pmos/$VERSION/" \; 2>/dev/null || true
+
+    # Find existing loader entry created by pmOS tooling
+    EXISTING_ENTRY=$(find "$BUILDROOT/boot/loader/entries" -name "*.conf" -type f | head -1)
+
+    if [ -f "$EXISTING_ENTRY" ]; then
+        # Create new entry with boot counting
+        NEW_ENTRY="$BUILDROOT/boot/loader/entries/pmos-$VERSION+3.conf"
+
+        # Process the existing entry to update paths
+        while IFS= read -r line; do
+            case "$line" in
+                linux[[:space:]]*)
+                    # Extract filename and update path
+                    KERNEL_FILE=$(echo "$line" | sed 's/^linux[[:space:]]*//' | xargs basename)
+                    echo "linux	/pmos/$VERSION/$KERNEL_FILE"
+                    ;;
+                initrd[[:space:]]*)
+                    # Extract filename and update path
+                    INITRD_FILE=$(echo "$line" | sed 's/^initrd[[:space:]]*//' | xargs basename)
+                    echo "initrd	/pmos/$VERSION/$INITRD_FILE"
+                    ;;
+                devicetree[[:space:]]*)
+                    # Extract filename and update path
+                    DTB_FILE=$(echo "$line" | sed 's/^devicetree[[:space:]]*//' | xargs basename)
+                    # Check if DTB exists in versioned directory
+                    if [ -f "$BUILDROOT/boot/pmos/$VERSION/$DTB_FILE" ]; then
+                        echo "devicetree /pmos/$VERSION/$DTB_FILE"
+                    elif [ -f "$BUILDROOT/boot/pmos/$VERSION/dtbs/$DTB_FILE" ]; then
+                        echo "devicetree /pmos/$VERSION/dtbs/$DTB_FILE"
+                    else
+                        # Keep original line if DTB not found
+                        echo "$line"
+                    fi
+                    ;;
+                *)
+                    # Keep all other lines as-is
+                    echo "$line"                    ;;
+            esac
+        done < "$EXISTING_ENTRY" > "$NEW_ENTRY"
+
+        # Remove the original entry
+        rm -f "$EXISTING_ENTRY"
+    else
+        echo "Error: No existing boot loader entry found in $BUILDROOT/boot/loader/entries/"
+        exit 1
+    fi
+
+    # Clean up other artifacts
+    rm -f "$BUILDROOT/boot/System.map*"
+    rm -f "$BUILDROOT/boot/config-*"
+fi
