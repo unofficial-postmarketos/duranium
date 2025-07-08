@@ -1,0 +1,14 @@
+[Transfer]
+ProtectVersion=%A
+
+[Source]
+Type=regular-file
+Path=/
+PathRelativeTo=explicit
+MatchPattern=%M_@v_%a.esp.tar
+
+[Target]
+Type=directory
+Path=/
+PathRelativeTo=boot
+InstancesMax=2
