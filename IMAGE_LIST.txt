@@ -1,0 +1,13 @@
+The list:
+
+edge release:
+- nvidia-tegra-armv7: console and gnome-desktop 
+- google-x64cros: plasma desktop and gnome desktop
+- qemu-x64_64: phosh and console
+
+longnoserob:
+	- nvidia-tegra-armv7: console and gnome-desktop 
+WeirdTreeThing
+	- google-x64cros: plasma desktop
+@opensourceopenmind@vivaldi.net:
+	- qemu-x64_64: phosh
