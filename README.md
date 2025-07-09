@@ -1,3 +1,18 @@
+# How to use
+
+Build image: `mkosi build --force --debug-workspace`
+
+Boot image in qemu:
+```
+   # Add extra space to disk so repart can create partitions
+   $ truncate -s +10G mkosi.output/postmarketOS_edge-2025.07.09-1_arm64.raw
+   $ qemu-system-aarch64 -machine virt -cpu host -enable-kvm -m 8G -smp 4 -drive if=pflash,format=raw,readonly=on,file=/usr/share/AAVMF/AAVMF_CODE.fd -drive if=pflash,format=raw,file=AAVMF_VARS.fd -nographic -serial mon:stdio -drive format=raw,file=mkosi.output/postmarketOS_edge-2025.07.09-1_arm64.raw
+```
+TODO: There's probably a way to simplify this with `mkosi vm`
+
+Notes:
+   - EFI in qemu is required, adjust pflash params for host arch
+
 # mkosi Configuration
 
 Immutable postmarketOS system with A/B slots
