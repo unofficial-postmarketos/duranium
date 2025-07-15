@@ -22,49 +22,54 @@ f /etc/fstab 0644 root root -
 
 EOF
 
-# Generate symlink entries for everything else
-find "$BUILDROOT/usr/share/factory/etc" -mindepth 1 -printf '%P\n' | while read -r path; do
+# Create directory structure with preserved permissions
+find "$BUILDROOT/usr/share/factory/etc" -type d -printf '%P\n' | while read -r path; do
+    [ -z "$path" ] && continue
+    full_path="$BUILDROOT/usr/share/factory/etc/$path"
+    perms=$(stat -c '%a' "$full_path")
+    echo "d /etc/$path $perms - - -"
+done >> "$BUILDROOT/usr/lib/tmpfiles.d/etc.conf"
+
+# Create symlinks for all files
+find "$BUILDROOT/usr/share/factory/etc" -type f -printf '%P\n' | while read -r path; do
     case "$path" in
-        passwd|group|shadow|gshadow|group-|passwd-|shadow-)
-            ;;
-        .pwd.lock|machine-id|hostname|fstab)
-            ;;
-        */)
+        passwd|group|shadow|gshadow|group-|passwd-|shadow-|.pwd.lock|machine-id|hostname|fstab)
+            # Skip these, they'll either be copied (above) or created on first boot
             ;;
         *)
-            full_path="$BUILDROOT/usr/share/factory/etc/$path"
-            if [ -L "$full_path" ]; then
-                target=$(readlink "$full_path")
-                case "$target" in
-                    ../*)
-                        # Relative symlink pointing outside /etc - use original target
-                        echo "L /etc/$path - - - - $target"
-                        ;;
-                    *)
-                        # Regular symlink within /etc
-                        echo "L /etc/$path"
-                        ;;
-                esac
-            else
-                echo "L /etc/$path"
-            fi
+            echo "L /etc/$path - - - - /usr/share/factory/etc/$path"
             ;;
     esac
 done >> "$BUILDROOT/usr/lib/tmpfiles.d/etc.conf"
 
-# # Find the loader entry created by packages
-# LOADER_ENTRY=$(find "$BUILDROOT/boot/loader/entries" -name "*.conf" | head -1)
-
-# if [ -f "$LOADER_ENTRY" ]; then
-#     # Extract cmdline from options line
-#     CMDLINE=$(grep "^options" "$LOADER_ENTRY" | sed 's/^options[[:space:]]*//')
-    
-#     # Save it for mkosi to use
-#     echo "$CMDLINE" > "$BUILDROOT/etc/kernel/cmdline"
-    
-#     # Remove the package-created entry
-#     rm -f "$LOADER_ENTRY"
-# fi
+# Handle existing symlinks in factory
+find "$BUILDROOT/usr/share/factory/etc" -type l -printf '%P\n' | while read -r path; do
+    case "$path" in
+        passwd|group|shadow|gshadow|group-|passwd-|shadow-|.pwd.lock|machine-id|hostname|fstab)
+            ;;
+        *)
+            full_path="$BUILDROOT/usr/share/factory/etc/$path"
+            target=$(readlink "$full_path")
+            case "$target" in
+                /*)
+                    # Absolute path - use as-is
+                    echo "L /etc/$path - - - - $target"
+                    ;;
+                ../*)
+                    # Relative symlink outside of /etc - use original target
+                    echo "L /etc/$path - - - - $target"
+                    ;;
+                *)
+                    # Relative symlink within /etc - resolve relative to
+                    # symlink's directory
+                    link_dir=$(dirname "/etc/$path")
+                    resolved_target="$link_dir/$target"
+                    echo "L /etc/$path - - - - /usr/share/factory$resolved_target"
+                    ;;
+            esac
+            ;;
+    esac
+done >> "$BUILDROOT/usr/lib/tmpfiles.d/etc.conf"
 
 # Reorganize boot artifacts for ESP layout
 if [ -d "$BUILDROOT/boot" ]; then
