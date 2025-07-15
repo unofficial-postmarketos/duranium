@@ -1,3 +1,7 @@
+# Design
+
+The design is currently documented here: https://notes.postmarketos.org/docs/0610efde-84a0-4763-a1c5-9dc953db7bb2/
+
 # How to use
 
 Build image: `mkosi build --force --debug-workspace`
