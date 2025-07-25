@@ -1,0 +1,28 @@
+#!/bin/sh
+release=$(awk -F= '/^Release=/ {print $2}' mkosi.conf | tr -d ' ')
+
+if [ "$release" = "edge" ]; then
+    version_prefix="edge"
+else
+    version_prefix="v${release}"
+fi
+
+current_date="$(date -u '+%Y.%m.%d')"
+
+# Read existing version if file exists and is not empty
+if [ -f mkosi.version ] && [ -s mkosi.version ]; then
+    prev_version=$(cat mkosi.version)
+    prev_date=$(echo "$prev_version" | cut -d'-' -f2 2>/dev/null)
+    prev_revision=$(echo "$prev_version" | cut -d'-' -f3 2>/dev/null)
+
+    # Check if we could parse the date and it matches today
+    if [ "$prev_date" = "$current_date" ] && [ -n "$prev_revision" ]; then
+        revision=$((prev_revision + 1))
+    else
+        revision=1
+    fi
+else
+    revision=1
+fi
+
+echo "${version_prefix}-${current_date}-${revision}"

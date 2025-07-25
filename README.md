@@ -4,7 +4,7 @@ The design is currently documented here: https://notes.postmarketos.org/docs/061
 
 # How to use
 
-Build image: `mkosi build --force --debug-workspace`
+Build image: `mkosi build --auto-bump --force --debug-workspace`
 
 Boot image in qemu: `mkosi vm --console=gui`
 
