@@ -101,7 +101,7 @@ if [ -d "$BUILDROOT/boot" ]; then
 
     if [ -f "$EXISTING_ENTRY" ]; then
         # Create new entry with boot counting
-        NEW_ENTRY="$BUILDROOT/boot/loader/entries/pmos-$VERSION+3.conf"
+        NEW_ENTRY="$BUILDROOT/boot/loader/entries/${IMAGE_ID}_${IMAGE_VERSION}_${ARCHITECTURE}+3.conf"
 
         # Process the existing entry to update paths
         while IFS= read -r line; do
@@ -145,4 +145,8 @@ if [ -d "$BUILDROOT/boot" ]; then
     # Clean up other artifacts
     rm -f "$BUILDROOT/boot/System.map*"
     rm -f "$BUILDROOT/boot/config-*"
+
+    # Create kernel artifacts tar
+    cd "$BUILDROOT/boot/pmos/$IMAGE_VERSION"
+    tar --owner=0 --group=0 -cf "$OUTPUTDIR/${IMAGE_ID}_${IMAGE_VERSION}_${ARCHITECTURE}.kernel.tar" .
 fi
