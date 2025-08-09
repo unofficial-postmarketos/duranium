@@ -1,6 +1,10 @@
 #!/bin/sh
 set -e
 
+# Remove package manager config, since we don't even want to pretend that this
+# will work
+rm -r "$BUILDROOT"/etc/apk
+
 # Move /etc, /var, and /opt to /usr/share/factory
 mkdir -p "$BUILDROOT/usr/share/factory"
 for d in etc var opt; do
