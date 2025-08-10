@@ -1,28 +1,27 @@
 #!/bin/sh
-release=$(awk -F= '/^Release=/ {print $2}' mkosi.conf | tr -d ' ')
 
-if [ "$release" = "edge" ]; then
-    version_prefix="edge"
-else
-    version_prefix="v${release}"
-fi
+current_date="$(date -u '+%y%m%d')"
 
-current_date="$(date -u '+%Y.%m.%d')"
-
-# Read existing version if file exists and is not empty
 if [ -f mkosi.version ] && [ -s mkosi.version ]; then
     prev_version=$(cat mkosi.version)
-    prev_date=$(echo "$prev_version" | cut -d'-' -f2 2>/dev/null)
-    prev_revision=$(echo "$prev_version" | cut -d'-' -f3 2>/dev/null)
+    # Version in form YYMMDDXX (8 chars: date + revision)
+    if [ ${#prev_version} -eq 8 ]; then
+        prev_date="${prev_version%??}"
+        prev_revision="${prev_version#"${prev_date}"}"
 
-    # Check if we could parse the date and it matches today
-    if [ "$prev_date" = "$current_date" ] && [ -n "$prev_revision" ]; then
-        revision=$((prev_revision + 1))
+        # Check if date matches today and revision is valid
+        if [ "$prev_date" = "$current_date" ] && [ -n "$prev_revision" ] 2>/dev/null; then
+            revision=$(($(echo "ibase=10; $prev_revision" | bc) + 1))
+            revision=$(printf "%02d" "$revision")
+        else
+            revision="01"
+        fi
     else
-        revision=1
+        # Invalid format, start fresh
+        revision="01"
     fi
 else
-    revision=1
+    revision="01"
 fi
 
-echo "${version_prefix}-${current_date}-${revision}"
+echo "${current_date}${revision}"
