@@ -1,0 +1,38 @@
+# INFO: To add new device, UI, and release images, see .ci/combos.py
+#
+# NOTE: normally we'd want "latest", but mkosi is still in aports/testing
+image: alpine:edge
+stages:
+  # TODO: build-packages is not necessary once the duranium stuff is upstreamed
+  # in pmaports! But might be good to keep the config here in case we want to
+  # build custom branches for some reason...
+  - prepare
+  - build-packages
+  - build-image
+  - deploy-image
+
+generate-image-jobs:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+  stage: prepare
+  needs: []
+  script:
+    - apk add python3 py3-jinja2
+    - python .ci/generate_image_jobs.py .ci/image-jobs.yaml.j2 .ci/image-jobs.yaml
+  artifacts:
+    paths:
+      - .ci/image-jobs.yaml
+
+image-jobs:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+  stage: build-packages
+  trigger:
+    include:
+      - artifact: .ci/image-jobs.yaml
+        job: generate-image-jobs
+    strategy: depend
