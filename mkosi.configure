@@ -1,3 +1,0 @@
-#!/bin/sh
-# FIXME: get this from pmb or ?
-jq '.Packages += ["postmarketos-ui-console", "device-qemu-aarch64", "device-qemu-aarch64-kernel-stable"]'
