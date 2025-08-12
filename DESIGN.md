@@ -202,6 +202,37 @@ mkosi.profiles/
     └── mkosi.conf
 ```
 
+### Deploying on HTTP server
+
+sysupdate is configured to query/fetch image updates from a remote HTTP server. Images should be laid out on the server under directories named after the image's `ImageId`, and each `ImageId` directory should contain a file `SHA256SUMS` that serves as a manifest of available images for sysupdate along with a checksum of the image files. This manifest should be signed (`SHA256SUMS.gpg`), and the public key included in images created by mkosi so that they can be verified at runtime.
+
+Image files (except the UKI) will be compressed to save space on the server and reduce download size.
+
+An example layout might look something like this:
+
+````
+qmu_a64_consol_edge/
+├── qmu_a64_consol_edge_25081111_arm64.efi
+├── qmu_a64_consol_edge_25081111_arm64.usr-arm64-verity-sig.e57b459d4a3f4260805fb3481f99b1de.raw.xz
+├── qmu_a64_consol_edge_25081111_arm64.usr-arm64-verity.4c62010a14dda6d767e3108092367651.raw.xz
+├── qmu_a64_consol_edge_25081111_arm64.usr-arm64.77415c80aa85f09c68ab25fba2481fa2.raw.xz
+├── qmu_a64_consol_edge_25081111_arm64.efi
+├── qmu_a64_consol_edge_25082001_arm64.usr-arm64-verity-sig.1ed99882ef219b02a5a5dcd0e8127161.raw.xz
+├── qmu_a64_consol_edge_25082001_arm64.usr-arm64-verity.5d8faa5c7560e499080bd6993ed67359.raw.xz
+├── qmu_a64_consol_edge_25082001_arm64.usr-arm64.60c62c8db2a1c111ad9d53fe69a74074.raw.xz
+├── SHA256SUMS
+├── SHA256SUMS.gpg
+p64_ppp_phosh_edge/
+├── p64_ppp_phosh_edge_25081111_arm64.efi
+├── p64_ppp_phosh_edge_25081111_arm64.usr-arm64-verity-sig.6cc10fdd3e5ac8377defe389c21c47d6.raw.xz
+├── p64_ppp_phosh_edge_25081111_arm64.usr-arm64-verity.e07910a06a086c83ba41827aa00b26ed.raw.xz
+├── p64_ppp_phosh_edge_25081111_arm64.usr-arm64.34c5f9b2cd3e1504604d186a190cbaaf.raw.xz
+├── SHA256SUMS
+├── SHA256SUMS.gpg
+```
+
+A mkosi profile, `compressed`, will automatically compress the usr+verity partitions and generate a SHA256SUMs file with these artifacts listed in it that can be appended to an existing manifest on the HTTP server when the new artifacts are deployed to it.
+
 ## Booting
 
 As mentioned previously, EFI is required for booting in this design. Devicetree handling, where u-boot or dtbloader are used, and "generic" kernels (i.e. support multiple devices) were considered.
