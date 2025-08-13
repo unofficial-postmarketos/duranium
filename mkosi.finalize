@@ -191,11 +191,6 @@ if [ -d "$BUILDROOT/boot" ]; then
         # Remove kernel
         [ -n "$KERNEL_FILE" ] && rm -f "$BUILDROOT/boot/$KERNEL_FILE"
 
-        # Remove initramfs files
-        for initrd in $INITRD_FILES; do
-            rm -f "$BUILDROOT/boot/$initrd"
-        done
-
         # Remove loader entries (UKI replaces these)
         rm -rf "$BUILDROOT/boot/loader"
 
