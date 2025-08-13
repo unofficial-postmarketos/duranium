@@ -1,20 +1,21 @@
 #!/bin/sh
 set -eu
 
+set -x
 cd "$OUTPUTDIR"
 
 # Find files matching current IMAGE_ID and IMAGE_VERSION
-pattern="${IMAGE_ID}_${IMAGE_VERSION}_${ARCHITECTURE}"
+pattern="${IMAGE_ID}_${IMAGE_VERSION}"
 
 # Compress usr partition files with xz -9
-for rawfile in "$pattern".usr-"$ARCHITECTURE"*.raw; do
+for rawfile in "$pattern".usr-*.raw; do
     [ -f "$rawfile" ] || continue
     echo "Compressing $rawfile..."
     xz -T0 -9 "$rawfile"
 done
 
 # Generate SHA256SUMS for usr partition artifacts
-sha256sum "$pattern".usr-"$ARCHITECTURE"*.raw.xz "$pattern".efi >> SHA256SUMS
+sha256sum "$pattern".usr-*.raw.xz "$pattern".efi >> SHA256SUMS
 
 # Compress main disk image and generate individual checksum
 if [ -f "$pattern.raw" ]; then
