@@ -5,19 +5,26 @@ import subprocess
 import os
 
 # Profile mapping dictionaries
+# IMPORTANT: must not exceed: 3 char for mfg and 6 char for model
 DEVICE_PROFILES = {
-    'device-qemu-aarch64': 'qmu_a64',
-    'device-pine64-pinephone': 'p64_pho',
+    'device-generic-x86_64': 'gen_x86_64',
+    'device-qemu-aarch64': 'qmu_arm64',
+    'device-pine64-pinephone': 'p64_pphone',
     'device-pine64-pinephone-pro': 'p64_ppp',
     # Add more device mappings here
 }
 
+# IMPORTANT: must not exceed 5 char!
 UI_PROFILES = {
-    'ui-console': 'consol',
-    'ui-cosmic': 'cosmic',
-    'ui-gnome-mobile': 'gnomob',
+    'ui-console': 'consl',
+    'ui-cosmic': 'cosmc',
+    'ui-gnome-mobile': 'gnomo',
     'ui-phosh': 'phosh',
     'ui-plasma-mobile': 'plamo',
+    'ui-gnome': 'gnome',
+    'ui-plasma-desktop': 'plade',
+    'ui-plasma-bigscreen': 'plabs',
+    'ui-sxmo': 'sxmo',
     # Add more UI mappings here
 }
 
