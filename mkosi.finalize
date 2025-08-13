@@ -5,6 +5,10 @@ set -e
 # will work
 rm -r "$BUILDROOT"/etc/apk
 
+# Clear out pam.d from factory, this config is installed from systemd and
+# conflicts with config we/Alpine provide
+rm -r "$BUILDROOT/usr/share/factory/etc/pam.d"
+
 # Move /etc, /var, and /opt to /usr/share/factory
 mkdir -p "$BUILDROOT/usr/share/factory"
 for d in etc var opt; do
