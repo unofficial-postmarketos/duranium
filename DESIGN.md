@@ -84,11 +84,11 @@ A lot consideration was taken to choose a versioning scheme for images, because 
 
 Given all of these requirements, the following format is used:
 
-`{mfg_3}_{model_3}_{ui_6}_{release_4}_{date_6}{rev_2}`
+`{mfg_3}_{model_6}_{ui_5}_{release_4}_{date_6}{rev_2}`
 
 In this format:
 
-* `ImageId / IMAGE_ID` = `{mfg_3}_{model_3}_{ui_6}`
+* `ImageId / IMAGE_ID` = `{mfg_3}_{model_6}_{ui_5}`
 
 * `ImageVersion / IMAGE_VERSION` = `{date_6}{rev_2}`
 
@@ -96,9 +96,9 @@ In this format:
 
 * **mfg (3 chars):** Manufacturer code (`p64`=Pine64, `smg`=Samsung, `mft`=Microsoft, `len`=Lenovo, `ggl`=Google, etc.)
 
-* **model (3 chars):** Device model within manufacturer (`pho`=PinePhone, `ppp`=PinePhone Pro, `s4m`=Galaxy S4 Mini, `21b`=Thinkpad x13s/21bx)
+* **model (6 chars):** Device model within manufacturer (`pineph`=PinePhone, `ppp`=PinePhone Pro, `gaxy4m`=Galaxy S4 Mini, `21bx`=Thinkpad x13s/21bx)
 
-* **ui (6 chars):** Interface (`phosh`, `gnomob`=GNOME Mobile, `plamo`=Plasma Mobile)
+* **ui (5 chars):** Interface (`phosh`, `gnomo`=GNOME Mobile, `plamo`=Plasma Mobile)
 
 * **release (4 chars):** `edge` for edge builds, `YYMM` for stable (e.g., `2506` for v25.06)
 
@@ -110,11 +110,11 @@ For **partition names**, this translates to: `Version` + `_{suffix_3}` where suf
 
 **Examples:**
 
-* Edge: `p64_pho_phosh_edge_24011501`
+* Edge: `p64_pineph_phosh_edge_24011501`
 
-* Stable: `p64_pho_phosh_2506_24011501`
+* Stable: `p64_pineph_phosh_2506_24011501`
 
-* Partition labels: `p64_pho_phosh_edge_24011501_usr`, `p64_pho_phosh_edge_24011501_vty`
+* Partition labels: `p64_pineph_phosh_edge_24011501_usr`, `p64_pineph_phosh_edge_24011501_vty`
 
 ## Partition Layout
 
