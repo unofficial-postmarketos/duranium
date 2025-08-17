@@ -192,7 +192,7 @@ if [ -d "$BUILDROOT/boot" ]; then
         [ -n "$KERNEL_FILE" ] && rm -f "$BUILDROOT/boot/$KERNEL_FILE"
 
         # Remove loader entries (UKI replaces these)
-        rm -rf "$BUILDROOT/boot/loader"
+        rm -rf "$BUILDROOT/boot/loader/entries"
 
         # Remove systemd-boot, mkosi will re-install this later. This is kinda
         # dumb to do but it avoids changes to mkosi so it doesn't get stuck on
