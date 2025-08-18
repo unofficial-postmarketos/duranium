@@ -13,6 +13,7 @@ DEVICE_PROFILES = {
     'device-pine64-pinephone': 'p64_pphone',
     'device-pine64-pinephone-pro': 'p64_ppp',
     'device-qemu-aarch64': 'qmu_arm64',
+    'device-qemu-amd64': 'qmu_amd64',
     # Add more device mappings here
 }
 
