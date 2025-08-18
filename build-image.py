@@ -8,9 +8,10 @@ import os
 # IMPORTANT: must not exceed: 3 char for mfg and 6 char for model
 DEVICE_PROFILES = {
     'device-generic-x86_64': 'gen_x86_64',
-    'device-qemu-aarch64': 'qmu_arm64',
+    'device-google-x64cros': 'ggl_x64cros',
     'device-pine64-pinephone': 'p64_pphone',
     'device-pine64-pinephone-pro': 'p64_ppp',
+    'device-qemu-aarch64': 'qmu_arm64',
     # Add more device mappings here
 }
 
