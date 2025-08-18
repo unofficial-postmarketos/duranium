@@ -7,24 +7,8 @@ cd "$OUTPUTDIR"
 # Find files matching current IMAGE_ID and IMAGE_VERSION
 pattern="${IMAGE_ID}_${IMAGE_VERSION}"
 
-# Compress usr partition files with xz -9
-for rawfile in "$pattern".usr-*.raw; do
-    [ -f "$rawfile" ] || continue
-    echo "Compressing $rawfile..."
-    xz -T0 -9 "$rawfile"
-done
+# Remove exported esp partition, we don't need it.
+rm -rf "$pattern".esp.raw.xz
 
 # Generate SHA256SUMS for usr partition artifacts
-sha256sum "$pattern".usr-*.raw.xz "$pattern".efi >> SHA256SUMS
-
-# Compress main disk image and generate individual checksum
-if [ -f "$pattern.raw" ]; then
-    echo "Compressing $pattern.raw..."
-    # Must keep the original disk image... mkosi makes a symlink to it and then
-    # tries to follow it and gets really sad if the link is broken :'(
-    xz --keep -T0 -9 "$pattern.raw"
-    sha256sum "$pattern.raw.xz" > "$pattern.raw.xz.sha256sum"
-fi
-
-# Remove exported esp partition, we don't need it.
-rm -rf "$pattern".esp.raw
+sha256sum "$pattern".*.xz "$pattern".efi >> SHA256SUMS
