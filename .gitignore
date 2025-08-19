@@ -8,3 +8,4 @@ mkosi.key
 mkosi.crt
 mkosi.version
 .mkosi-private
+*/__pycache__/
