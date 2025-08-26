@@ -152,17 +152,9 @@ if [ -d "$BUILDROOT/boot" ]; then
                 mkdir -p "$BUILDROOT/boot/dtbs"
                 mv "$BUILDROOT/boot/$DTB_BASENAME" "$BUILDROOT/boot/dtbs/$DTB_BASENAME"
             fi
-
-            # Remove all other DTB directories
-            rm -rf "$BUILDROOT"/boot/dtbs-*
-        else
-            # No devicetree line - auto-detect scenario
-            # Move all DTBs from dtbs-* to /boot/dtbs/
-            mkdir -p "$BUILDROOT/boot/dtbs"
-            for dtbdir in "$BUILDROOT"/boot/dtbs-*/; do
-                [ -d "$dtbdir" ] && cp -r "$dtbdir"* "$BUILDROOT/boot/dtbs/"
-            done
-            rm -rf "$BUILDROOT"/boot/dtbs-*
+        elif ls "$BUILDROOT"/boot/dtbs-*/ >/dev/null 2>&1; then
+                mkdir -p "$BUILDROOT/boot/dtbs"
+                cp -r "$BUILDROOT"/boot/dtbs-*/* "$BUILDROOT/boot/dtbs/"
         fi
 
         # Organize initramfs and microcode for mkosi UKI generation
@@ -210,3 +202,16 @@ if [ -d "$BUILDROOT/boot" ]; then
         exit 1
     fi
 fi
+
+# After all DTB processing above, copy to standard location for mkosi
+for kdir in "$BUILDROOT"/usr/lib/modules/*/; do
+    if [ -d "$kdir" ]; then
+        # Copy all DTBs to standard location
+        if [ -d "$BUILDROOT/boot/dtbs" ]; then
+            mkdir -p "$kdir/dtb"
+            cp -r "$BUILDROOT"/boot/dtbs/* "$kdir/dtb/"
+        fi
+        # FIXME: Assumes only one kernel version directory exists
+        break
+    fi
+done
