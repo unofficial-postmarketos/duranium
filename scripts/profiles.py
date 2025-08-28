@@ -2,6 +2,7 @@
 DEVICE_PROFILES = {
     'device-generic-x86_64': 'gen_x86_64',
     'device-google-x64cros': 'ggl_x64cros',
+    'device-lenovo-21bx': 'len_21bx',
     'device-nvidia-tegra-armv7': 'nvd_tgrav7',
     'device-pine64-pinephone': 'p64_pphone',
     'device-pine64-pinephone-pro': 'p64_ppp',
