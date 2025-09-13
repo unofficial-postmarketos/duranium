@@ -210,7 +210,7 @@ Image files (except the UKI) will be compressed to save space on the server and 
 
 An example layout might look something like this:
 
-````
+```
 qmu_a64_consol_edge/
 ├── qmu_a64_consol_edge_25081111_arm64.efi
 ├── qmu_a64_consol_edge_25081111_arm64.usr-arm64-verity-sig.raw.xz
