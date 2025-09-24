@@ -133,11 +133,14 @@ def generate_combinations(config: Dict[str, Any]) -> List[BuildCombination]:
 
     return combinations
 
-def build_single_image(combination: BuildCombination, extra_args: List[str]) -> BuildResult:
-    """Build a single image and return result"""
+def build_image(profiles: List[str], extra_args: List[str]) -> BuildResult:
+    """Core image building function used by both single and matrix modes"""
     start_time = time.time()
 
-    profiles = [combination.device, combination.ui, combination.release]
+    # Extract profile types for BuildResult
+    device_profile = next(p for p in profiles if p.startswith('device-'))
+    ui_profile = next(p for p in profiles if p.startswith('ui-'))
+    release_profile = next(p for p in profiles if p.startswith('release-'))
 
     try:
         # Validate and extract profile mappings
@@ -149,8 +152,8 @@ def build_single_image(combination: BuildCombination, extra_args: List[str]) -> 
         # Join profiles for mkosi --profiles argument
         profiles_str = ",".join(profiles)
 
-        print(f"Building: {combination.device} + {combination.ui} + {combination.release}")
-        print(f"ImageID: {image_id}")
+        print(f"Generated ImageID: {image_id}")
+        print(f"Using profiles: {profiles_str}")
 
         # Call mkosi with generated ImageId and profiles
         mkosi_cmd = [
@@ -161,22 +164,24 @@ def build_single_image(combination: BuildCombination, extra_args: List[str]) -> 
             f"--profile={profiles_str}",
         ] + extra_args
 
+        print(f"Executing: {' '.join(mkosi_cmd)}")
+
         subprocess.run(mkosi_cmd, check=True)
 
         duration = time.time() - start_time
-        return BuildResult(combination.device, combination.ui, combination.release, True, duration=duration)
+        return BuildResult(device_profile, ui_profile, release_profile, True, duration=duration)
 
     except subprocess.CalledProcessError as e:
         duration = time.time() - start_time
-        return BuildResult(combination.device, combination.ui, combination.release, False,
+        return BuildResult(device_profile, ui_profile, release_profile, False,
                          f"mkosi failed with exit code {e.returncode}", duration)
     except FileNotFoundError:
         duration = time.time() - start_time
-        return BuildResult(combination.device, combination.ui, combination.release, False,
+        return BuildResult(device_profile, ui_profile, release_profile, False,
                          "mkosi command not found", duration)
     except Exception as e:
         duration = time.time() - start_time
-        return BuildResult(combination.device, combination.ui, combination.release, False,
+        return BuildResult(device_profile, ui_profile, release_profile, False,
                          str(e), duration)
 
 def print_summary(results: List[BuildResult]):
@@ -208,7 +213,7 @@ def build_matrix(config_path: str, extra_args: List[str]):
     results = []
     for i, combination in enumerate(combinations, 1):
         print(f"\n[{i}/{len(combinations)}]")
-        result = build_single_image(combination, extra_args)
+        result = build_image([combination.device, combination.ui, combination.release], extra_args)
         results.append(result)
 
         if result.success:
@@ -220,39 +225,6 @@ def build_matrix(config_path: str, extra_args: List[str]):
 
     # Exit with error code if any builds failed
     if any(not r.success for r in results):
-        sys.exit(1)
-
-def build_single_legacy(profiles: List[str], extra_args: List[str]):
-    """Original single-image build logic"""
-    device_code, ui_code, release_code = validate_and_extract_profiles(profiles)
-
-    # Generate ImageId with profile codes
-    image_id = f"{device_code}_{ui_code}_{release_code}"
-
-    # Join profiles for mkosi --profiles argument
-    profiles_str = ",".join(profiles)
-
-    print(f"Generated ImageID: {image_id}")
-    print(f"Using profiles: {profiles_str}")
-
-    # Call mkosi with generated ImageId and profiles
-    mkosi_cmd = [
-        os.environ.get('MKOSI', 'mkosi'),
-        "build",
-        "--force",
-        f"--image-id={image_id}",
-        f"--profile={profiles_str}",
-    ] + extra_args
-
-    print(f"Executing: {' '.join(mkosi_cmd)}")
-
-    try:
-        subprocess.run(mkosi_cmd, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"ERROR: mkosi failed with exit code {e.returncode}")
-        sys.exit(e.returncode)
-    except FileNotFoundError:
-        print("ERROR: mkosi command not found")
         sys.exit(1)
 
 def main():
@@ -267,7 +239,7 @@ def main():
         # Matrix build mode
         build_matrix(args.config, extra_args)
     else:
-        # Legacy single build mode
+        # Single build mode
         if len(args.profiles) < 3:
             print("Usage: build-image.py <device-profile> <ui-profile> <release-profile> [mkosi-args...]")
             print("   or: build-image.py --config <config.yaml> [mkosi-args...]")
@@ -275,9 +247,10 @@ def main():
             print("Example: build-image.py --config build-images.yaml --profile=compressed")
             sys.exit(1)
 
-        profiles = args.profiles[:3]
-        remaining_args = args.profiles[3:] + extra_args
-        build_single_legacy(profiles, remaining_args)
+        result = build_image(args.profiles, extra_args)
+        if not result.success:
+            print(f"ERROR: {result.error}")
+            sys.exit(1)
 
 if __name__ == '__main__':
     main()
