@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+
+if [ -n "$PROFILES" ] && [ "$1" = "final" ]; then
+    # Disable interactive mode, it causes problems when apk is invoked below and
+    # this dir (/etc/apk) is removed in mkosi.finalize...
+    rm "$BUILDROOT/etc/apk/interactive"
+    cp /etc/apk/repositories "$BUILDROOT"/etc/apk
+
+    for profile in $PROFILES; do
+        pkg=
+        case "$profile" in
+            device-*) pkg="$profile";;
+            ui-*) pkg="postmarketos-$profile" ;;
+            *) continue ;;
+        esac
+        echo ">> Installing recommends for: $pkg"
+        mkosi-chroot /usr/bin/install-recommends "$pkg"
+    done
+
+    # Remove app manually, because mkosi doesn't have a mechanism to do this
+    # anymore. See: https://github.com/systemd/mkosi/issues/3911
+    mkosi-chroot apk del postmarketos-install-recommends
+
+    # Remove install-recommends cache
+    rm -rf "$BUILDROOT"/.cache
+fi
