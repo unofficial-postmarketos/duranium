@@ -213,20 +213,20 @@ An example layout might look something like this:
 ```
 qmu_a64_consol_edge/
 ├── qmu_a64_consol_edge_25081111_arm64.efi
-├── qmu_a64_consol_edge_25081111_arm64.usr-arm64-verity-sig.raw.xz
-├── qmu_a64_consol_edge_25081111_arm64.usr-arm64-verity.raw.xz
-├── qmu_a64_consol_edge_25081111_arm64.usr-arm64.raw.xz
+├── qmu_a64_consol_edge_25081111_arm64.usr-arm64-verity-sig.e57b459d4a3f4260805fb3481f99b1de.raw.xz
+├── qmu_a64_consol_edge_25081111_arm64.usr-arm64-verity.4c62010a14dda6d767e3108092367651.raw.xz
+├── qmu_a64_consol_edge_25081111_arm64.usr-arm64.77415c80aa85f09c68ab25fba2481fa2.raw.xz
 ├── qmu_a64_consol_edge_25081111_arm64.efi
-├── qmu_a64_consol_edge_25082001_arm64.usr-arm64-verity-sig.raw.xz
-├── qmu_a64_consol_edge_25082001_arm64.usr-arm64-verity.raw.xz
-├── qmu_a64_consol_edge_25082001_arm64.usr-arm64.raw.xz
+├── qmu_a64_consol_edge_25082001_arm64.usr-arm64-verity-sig.1ed99882ef219b02a5a5dcd0e8127161.raw.xz
+├── qmu_a64_consol_edge_25082001_arm64.usr-arm64-verity.5d8faa5c7560e499080bd6993ed67359.raw.xz
+├── qmu_a64_consol_edge_25082001_arm64.usr-arm64.60c62c8db2a1c111ad9d53fe69a74074.raw.xz
 ├── SHA256SUMS
 ├── SHA256SUMS.gpg
 p64_ppp_phosh_edge/
 ├── p64_ppp_phosh_edge_25081111_arm64.efi
-├── p64_ppp_phosh_edge_25081111_arm64.usr-arm64-verity-sig.raw.xz
-├── p64_ppp_phosh_edge_25081111_arm64.usr-arm64-verity.raw.xz
-├── p64_ppp_phosh_edge_25081111_arm64.usr-arm64.raw.xz
+├── p64_ppp_phosh_edge_25081111_arm64.usr-arm64-verity-sig.6cc10fdd3e5ac8377defe389c21c47d6.raw.xz
+├── p64_ppp_phosh_edge_25081111_arm64.usr-arm64-verity.e07910a06a086c83ba41827aa00b26ed.raw.xz
+├── p64_ppp_phosh_edge_25081111_arm64.usr-arm64.34c5f9b2cd3e1504604d186a190cbaaf.raw.xz
 ├── SHA256SUMS
 ├── SHA256SUMS.gpg
 ```
