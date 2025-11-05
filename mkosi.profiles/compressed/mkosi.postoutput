@@ -10,5 +10,10 @@ pattern="${IMAGE_ID}_${IMAGE_VERSION}"
 # Remove exported esp partition, we don't need it.
 rm -rf "$pattern".esp.raw.xz
 
+# mkosi insists on generating an initrd, which is totally useless for us, and
+# there's no way to tell it to stop, so just remove this thing so it doesn't end
+# up in the manifest.
+rm -rf initrd*
+
 # Generate SHA256SUMS for usr partition artifacts
 sha256sum "$pattern".*.xz "$pattern".efi >> SHA256SUMS
