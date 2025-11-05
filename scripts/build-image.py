@@ -13,8 +13,6 @@ try:
 except ImportError:
     yaml = None
 
-from profiles import DEVICE_PROFILES, RELEASE_PROFILES, UI_PROFILES
-
 @dataclass
 class BuildResult:
     device: str
@@ -31,18 +29,15 @@ class BuildCombination:
     release: str
 
 def validate_and_extract_profiles(profiles):
-    """Validate exactly one profile of each type and extract mappings"""
+    """Validate exactly one profile of each type and extract names"""
     device_profiles = []
     ui_profiles = []
-    release_profiles = []
 
     for profile in profiles:
         if profile.startswith('device-'):
             device_profiles.append(profile)
         elif profile.startswith('ui-'):
             ui_profiles.append(profile)
-        elif profile.startswith('release-'):
-            release_profiles.append(profile)
         else:
             print(f"ERROR: Unknown profile type: {profile}")
             sys.exit(1)
@@ -56,32 +51,14 @@ def validate_and_extract_profiles(profiles):
         print(f"ERROR: Must specify exactly one UI profile, got {len(ui_profiles)}: {ui_profiles}")
         sys.exit(1)
 
-    if len(release_profiles) != 1:
-        print(f"ERROR: Must specify exactly one release profile, got {len(release_profiles)}: {release_profiles}")
-        sys.exit(1)
-
     device_profile = device_profiles[0]
     ui_profile = ui_profiles[0]
-    release_profile = release_profiles[0]
 
-    # Map to short codes
-    if device_profile not in DEVICE_PROFILES:
-        print(f"ERROR: Unknown device profile: {device_profile}")
-        sys.exit(1)
+    # Extract names from profile strings (remove 'device-' and 'ui-' prefixes)
+    device_name = device_profile.replace('device-', '', 1)
+    ui_name = ui_profile.replace('ui-', '', 1)
 
-    if ui_profile not in UI_PROFILES:
-        print(f"ERROR: Unknown UI profile: {ui_profile}")
-        sys.exit(1)
-
-    if release_profile not in RELEASE_PROFILES:
-        print(f"ERROR: Unknown release profile: {release_profile}")
-        sys.exit(1)
-
-    return (
-        DEVICE_PROFILES[device_profile],
-        UI_PROFILES[ui_profile],
-        RELEASE_PROFILES[release_profile]
-    )
+    return device_name, ui_name
 
 def load_config(config_path: str) -> Dict[str, Any]:
     """Load and validate YAML config file"""
@@ -140,22 +117,27 @@ def build_image(profiles: List[str], extra_args: List[str]) -> BuildResult:
     # Extract profile types for BuildResult
     device_profile = next(p for p in profiles if p.startswith('device-'))
     ui_profile = next(p for p in profiles if p.startswith('ui-'))
-    release_profile = next(p for p in profiles if p.startswith('release-'))
 
     try:
-        # Validate and extract profile mappings
-        device_code, ui_code, release_code = validate_and_extract_profiles(profiles)
+        # Validate and extract profile names
+        device_name, ui_name = validate_and_extract_profiles(profiles)
 
-        # Generate ImageId with profile codes
-        image_id = f"{device_code}_{ui_code}_{release_code}"
+        # Extract release from extra_args
+        release = "edge"
+        for arg in extra_args:
+            if arg.startswith('--release='):
+                release = arg.split('=', 1)[1]
+            break
 
-        # Join profiles for mkosi --profiles argument
+        image_id = f"{device_name}_{ui_name}_{release}"
+
+        # Join profiles for mkosi --profile argument
         profiles_str = ",".join(profiles)
 
-        print(f"Generated ImageID: {image_id}")
-        print(f"Using profiles: {profiles_str}")
+        print(f"Device: {device_name}, UI: {ui_name}")
+        print(f"ImageID: {image_id}")
 
-        # Call mkosi with generated ImageId and profiles
+        # Call mkosi
         mkosi_cmd = [
             os.environ.get('MKOSI', 'mkosi'),
             "build",
@@ -169,19 +151,19 @@ def build_image(profiles: List[str], extra_args: List[str]) -> BuildResult:
         subprocess.run(mkosi_cmd, check=True)
 
         duration = time.time() - start_time
-        return BuildResult(device_profile, ui_profile, release_profile, True, duration=duration)
+        return BuildResult(device_profile, ui_profile, "release", True, duration=duration)
 
     except subprocess.CalledProcessError as e:
         duration = time.time() - start_time
-        return BuildResult(device_profile, ui_profile, release_profile, False,
+        return BuildResult(device_profile, ui_profile, "release", False,
                          f"mkosi failed with exit code {e.returncode}", duration)
     except FileNotFoundError:
         duration = time.time() - start_time
-        return BuildResult(device_profile, ui_profile, release_profile, False,
+        return BuildResult(device_profile, ui_profile, "release", False,
                          "mkosi command not found", duration)
     except Exception as e:
         duration = time.time() - start_time
-        return BuildResult(device_profile, ui_profile, release_profile, False,
+        return BuildResult(device_profile, ui_profile, "release", False,
                          str(e), duration)
 
 def print_summary(results: List[BuildResult]):
@@ -213,7 +195,9 @@ def build_matrix(config_path: str, extra_args: List[str]):
     results = []
     for i, combination in enumerate(combinations, 1):
         print(f"\n[{i}/{len(combinations)}]")
-        result = build_image([combination.device, combination.ui, combination.release], extra_args)
+
+        build_args = [f"--release={combination.release}"] + extra_args
+        result = build_image([combination.device, combination.ui], build_args)
         results.append(result)
 
         if result.success:
@@ -230,7 +214,7 @@ def build_matrix(config_path: str, extra_args: List[str]):
 def main():
     parser = argparse.ArgumentParser(description='Build postmarketOS images using mkosi profiles')
     parser.add_argument('--config', help='YAML config file for building multiple image combinations')
-    parser.add_argument('profiles', nargs='*', help='Device, UI, and release profiles (when not using --config)')
+    parser.add_argument('profiles', nargs='*', help='Device and UI profiles (when not using --config)')
 
     # Parse known args so we can pass through extra mkosi args
     args, extra_args = parser.parse_known_args()
@@ -240,10 +224,10 @@ def main():
         build_matrix(args.config, extra_args)
     else:
         # Single build mode
-        if len(args.profiles) < 3:
-            print("Usage: build-image.py <device-profile> <ui-profile> <release-profile> [mkosi-args...]")
+        if len(args.profiles) < 2:
+            print("Usage: build-image.py <device-profile> <ui-profile> [mkosi-args...]")
             print("   or: build-image.py --config <config.yaml> [mkosi-args...]")
-            print("Example: build-image.py device-pine64-pinephone ui-plasma-mobile release-edge --profile=compressed --force")
+            print("Example: build-image.py device-pine64-pinephone ui-plasma-mobile --release=edge --profile=compressed")
             print("Example: build-image.py --config build-images.yaml --profile=compressed")
             sys.exit(1)
 
