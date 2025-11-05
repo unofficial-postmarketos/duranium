@@ -143,6 +143,8 @@ def build_image(profiles: List[str], extra_args: List[str]) -> BuildResult:
             "build",
             "--force",
             f"--image-id={image_id}",
+            f"--environment=PMOS_DEVICE={device_name}",
+            f"--environment=PMOS_VARIANT={ui_name}",
             f"--profile={profiles_str}",
         ] + extra_args
 
