@@ -24,6 +24,8 @@ The design uses mkosi for image building with systemd tooling for A/B updates (s
 
 * **First-boot provisioning**: Initial setup wizard assists user with creating account
 
+* Release switching: sysupdate config changed in /etc to switch to new release or a different UI
+
 # System Architecture
 
 ## Boot Overview
@@ -70,51 +72,34 @@ This uses boot-deploy's existing DTB resolution logic (by reading the sd-boot co
 
 ## Versioning
 
-A lot consideration was taken to choose a versioning scheme for images, because there are several components that need to agree on a versioning scheme and some of these components have constraints that need to be accounted for. These components use an `ImageId` (aka `IMAGE_ID` in os-release) and `ImageVersion` (aka `IMAGE_VERSION` in os-release).
+A lot consideration was taken to choose a versioning scheme for images, because we do not want to accidentally configure sysupdate to flash incompatible or unexpected images to devices during update, and there are limitations to how long partitions labels can be.
 
-* **mkosi**: Uses the id+version to generate image artifacts that are ultimately enumerated/fetched by sysupdate.
+os-release is used to set a variety of parameters for images:
 
-* **sysupdate**: Uses the id+version to identify when updates are available. Sysupdate uses the id+version info that is stored in the GPT partition name to determine which partition to preserve and which one to install an image update to. Sysupdate also requires that newer image updates have an version that's higher than the currently active image.
+* `IMAGE_ID`: Contains the device name, e.g. `qemu-aarch64`, `apple-mac-aarch64`, `generic-x86_64`, `lenovo-21bx`
 
-* **repart**: mkosi calls repart when creating a full disk image for provisioning a system, and embeds the id+version in the active slot partition name.
+* `VARIANT_ID`: Contains the UI, e.g. `gnome`, `plasma-mobile`, `console`, `cosmic`
 
-* **GPT Partition Name**: This field is limited to a maximum of 34 characters, so any id+version needs to fit within this size.
+* `VERSION_ID`: Contains the release, e.g. `edge`, `v25.06`
+
+* `IMAGE_VERSION`: Contains a build date code and increment, e.g. `25110402`
+
+* **mkosi**: Uses ImageId (from build-image.py) for output filenames, but `IMAGE_ID` in `os-release`, used by repart for partition labels and sysupdate for matching, is overwritten in `mkosi.finalize` to only specify the device name.
+
+* **sysupdate**: Uses these to identify when updates are available. Sysupdate uses the `IMAGE_ID`+`IMAGE_VERSION` stored in the GPT partition name to determine which partition to preserve and which one to install an image update to. Sysupdate also requires that newer image updates have an version that's higher than the currently active image. Sysupdate uses all of these variables from os-release to search for updates. Modifying `VARIANT_ID` and/or `VERSION_ID` in `/etc/os-release` after image installation and running sysupdate allows one to switch to a different UI or release, respectively.
+
+* **repart**: mkosi calls repart when creating a full disk image for provisioning a system, and embeds the `IMAGE_ID` and `IMAGE_VERSION` in the active slot partition name.
+
+* **GPT Partition Name**: This field is limited to a maximum of 34 characters, so `IMAGE_ID` + `IMAGE_VERSION` needs to fit. In order to fix within this size, the device name should be limited to a maximum of 21 characters in order to leave enough space for including the `IMAGE_VERION`. Some space should also be reserved for indicating the partition type as suffix. Sysupdate uses the suffix to select the correct partition image during updates.
 
 * **postmarketOS**: There are many device ports, dozens of UIs, and multiple releases (edge, stable releases), and the id needs to be able to differentiate between all different combinations so that we do not accidentally cause sysupdate to flash an incompatible image update on a device.
 
-Given all of these requirements, the following format is used:
+Given all of these requirements, the following format is used for partition labels:
 
-`{mfg_3}_{model_6}_{ui_5}_{release_4}_{date_6}{rev_2}`
+`{IMAGE_ID}_{IMAGE_VERSION}_{partition type suffix}` = device(21) + _(1) + version(8) + _(1) + suffix(3) = 34 chars max
 
-In this format:
+A real world example of a partition label in this format might look like: `pine64-pinephone_25110402_vty` for the /usr verity partition on a pine64 pinephone.
 
-* `ImageId / IMAGE_ID` = `{mfg_3}_{model_6}_{ui_5}`
-
-* `ImageVersion / IMAGE_VERSION` = `{date_6}{rev_2}`
-
-**Component Definitions:**
-
-* **mfg (3 chars):** Manufacturer code (`p64`=Pine64, `smg`=Samsung, `mft`=Microsoft, `len`=Lenovo, `ggl`=Google, etc.)
-
-* **model (6 chars):** Device model within manufacturer (`pineph`=PinePhone, `ppp`=PinePhone Pro, `gaxy4m`=Galaxy S4 Mini, `21bx`=Thinkpad x13s/21bx)
-
-* **ui (5 chars):** Interface (`phosh`, `gnomo`=GNOME Mobile, `plamo`=Plasma Mobile)
-
-* **release (4 chars):** `edge` for edge builds, `YYMM` for stable (e.g., `2506` for v25.06)
-
-* **date (6 chars):** `YYMMDD` format (e.g., `240115` for 2024-01-15)
-
-* **rev (2 chars):** Daily revision counter (`01`, `02`, etc.)
-
-For **partition names**, this translates to: `Version` + `_{suffix_3}` where suffix = `usr`, `vty`, `vts` for the usr, usr-verity, and user-verity-signing partitions respectively.
-
-**Examples:**
-
-* Edge: `p64_pineph_phosh_edge_24011501`
-
-* Stable: `p64_pineph_phosh_2506_24011501`
-
-* Partition labels: `p64_pineph_phosh_edge_24011501_usr`, `p64_pineph_phosh_edge_24011501_vty`
 
 ## Partition Layout
 
@@ -154,8 +139,8 @@ For **partition names**, this translates to: `Version` + `_{suffix_3}` where suf
 │   │   └── ...
 │   └── ...
 └── EFI/Linux/
-    ├── len_21b_phosh_edge_25071501_arm64.efi          # UKI (dtb(s) in dtbauto sections)
-    └── len_21b_phosh_edge_25071801_arm64.efi+3-0.efi  # Next version with boot counting
+    ├── lenovo_21bx_phosh_edge_25071501_arm64.efi          # UKI (dtb(s) in dtbauto sections)
+    └── lenovo_21bx_phosh_edge_25071801_arm64.efi+3-0.efi  # Next version with boot counting
 ```
 
 ## Image Building
@@ -166,21 +151,23 @@ The profiles themselves are quite simple, often just including a single package,
 
 ### Build Process
 
-1. **Device profile** installs device-specific package
+1. **Device profile** installs device-specific package, build-image.py uses device name to construct the composite `ImageId=` setting for mkosi
 
-2. **UI profile** installs UI-specific package
+2. **UI profile** installs UI-specific package, build-image.py uses UI name to construct the composite `ImageId=` setting for mkosi, and mkosi.finalize sets `VARIANT_ID` in os-release
 
-3. **Release profile** configures repository sources for specific pmOS release
+3. Images are built using `build-image.py` wrapper script with these 2 profiles
 
-4. Images are built using `build-image.py` wrapper script with these 3 profiles
+4. Wrapper validates exactly one profile of each type is provided
 
-5. Wrapper validates exactly one profile of each type is provided
+5. Wrapper generates composite `ImageId` from device, UI profile names and release. The format for this is: `{device}_{ui}_{release}`
 
-6. Wrapper generates `ImageId` from profile names (see Versioning section)
+6. Wrapper invokes mkosi with `ImageId` and profiles, and passes (for `mkosi.finalize` ) `--environment=PMOS_VARIANT` and `--environment=PMOS_DEVICE`.
 
-7. Wrapper invokes mkosi with computed `ImageId` and profiles
+7. `mkosi.finalize` modifies os-release to: set `VARIANT_ID=$PMOS_VARIANT` and `IMAGE_ID=$PMOS_DEVICE`
 
-8. mkosi calculates `ImageVersion` and builds the image for the specified device, UI, and release
+8. mkosi uses composite `ImageId`, for output filenames via `Output=` in `mkosi.conf`, but repart uses device name-only `IMAGE_ID` from os-release for partition labels
+
+9. mkosi sets `VERSION_ID` in os-release from `Release=` (configured with a default in mkosi.conf or passed via `--release=` flag)
 
 ### Profile Structure
 
@@ -196,10 +183,6 @@ mkosi.profiles/
 │   └── mkosi.conf
 ├── ui-phosh/
 │   └── mkosi.conf
-├── release-edge/
-│   └── mkosi.conf
-└── release-v25.06/
-    └── mkosi.conf
 ```
 
 ### Deploying on HTTP server
@@ -211,22 +194,22 @@ Image files (except the UKI) will be compressed to save space on the server and 
 An example layout might look something like this:
 
 ```
-qmu_a64_consol_edge/
-├── qmu_a64_consol_edge_25081111_arm64.efi
-├── qmu_a64_consol_edge_25081111_arm64.usr-arm64-verity-sig.e57b459d4a3f4260805fb3481f99b1de.raw.xz
-├── qmu_a64_consol_edge_25081111_arm64.usr-arm64-verity.4c62010a14dda6d767e3108092367651.raw.xz
-├── qmu_a64_consol_edge_25081111_arm64.usr-arm64.77415c80aa85f09c68ab25fba2481fa2.raw.xz
-├── qmu_a64_consol_edge_25081111_arm64.efi
-├── qmu_a64_consol_edge_25082001_arm64.usr-arm64-verity-sig.1ed99882ef219b02a5a5dcd0e8127161.raw.xz
-├── qmu_a64_consol_edge_25082001_arm64.usr-arm64-verity.5d8faa5c7560e499080bd6993ed67359.raw.xz
-├── qmu_a64_consol_edge_25082001_arm64.usr-arm64.60c62c8db2a1c111ad9d53fe69a74074.raw.xz
+qemu-aarch64_console_edge/
+├── qemu-aarch64_console_edge_25081111_arm64.efi
+├── qemu-aarch64_console_edge_25081111_arm64.usr-arm64-verity-sig.e57b459d4a3f4260805fb3481f99b1de.raw.xz
+├── qemu-aarch64_console_edge_25081111_arm64.usr-arm64-verity.4c62010a14dda6d767e3108092367651.raw.xz
+├── qemu-aarch64_console_edge_25081111_arm64.usr-arm64.77415c80aa85f09c68ab25fba2481fa2.raw.xz
+├── qemu-aarch64_console_edge_25081111_arm64.efi
+├── qemu-aarch64_console_edge_25082001_arm64.usr-arm64-verity-sig.1ed99882ef219b02a5a5dcd0e8127161.raw.xz
+├── qemu-aarch64_console_edge_25082001_arm64.usr-arm64-verity.5d8faa5c7560e499080bd6993ed67359.raw.xz
+├── qemu-aarch64_console_edge_25082001_arm64.usr-arm64.60c62c8db2a1c111ad9d53fe69a74074.raw.xz
 ├── SHA256SUMS
 ├── SHA256SUMS.gpg
-p64_ppp_phosh_edge/
-├── p64_ppp_phosh_edge_25081111_arm64.efi
-├── p64_ppp_phosh_edge_25081111_arm64.usr-arm64-verity-sig.6cc10fdd3e5ac8377defe389c21c47d6.raw.xz
-├── p64_ppp_phosh_edge_25081111_arm64.usr-arm64-verity.e07910a06a086c83ba41827aa00b26ed.raw.xz
-├── p64_ppp_phosh_edge_25081111_arm64.usr-arm64.34c5f9b2cd3e1504604d186a190cbaaf.raw.xz
+pine64-pinephonepro_phosh_edge/
+├── pine64-pinephonepro_phosh_edge_25081111_arm64.efi
+├── pine64-pinephonepro_phosh_edge_25081111_arm64.usr-arm64-verity-sig.6cc10fdd3e5ac8377defe389c21c47d6.raw.xz
+├── pine64-pinephonepro_phosh_edge_25081111_arm64.usr-arm64-verity.e07910a06a086c83ba41827aa00b26ed.raw.xz
+├── pine64-pinephonepro_phosh_edge_25081111_arm64.usr-arm64.34c5f9b2cd3e1504604d186a190cbaaf.raw.xz
 ├── SHA256SUMS
 ├── SHA256SUMS.gpg
 ```
