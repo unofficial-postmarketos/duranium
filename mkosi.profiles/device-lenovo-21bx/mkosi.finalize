@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# Remove the el2 devicetree.
+# This works around an issue with dtbauto where it might pick the el2 devicetree when
+# booting in el1, which basically breaks everything.
+rm "$BUILDROOT"/usr/lib/modules/*/dtb/qcom/sc8280xp-lenovo-thinkpad-x13s-el2.dtb
