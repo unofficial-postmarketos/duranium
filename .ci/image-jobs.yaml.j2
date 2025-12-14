@@ -51,7 +51,7 @@ build-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
     - merge-usr
 
     # convert to pmOS
-    - ln -s /usr/share/distribution-gpg-keys/postmarketos/build.postmarketos.org.rsa.pub /etc/apk/keys
+    - ln -sf /usr/share/distribution-gpg-keys/postmarketos/build.postmarketos.org.rsa.pub /etc/apk/keys
     - echo "http://mirror.postmarketos.org/postmarketos/extra-repos/systemd/master" >> /etc/apk/repositories
     - echo "http://mirror.postmarketos.org/postmarketos/master" >> /etc/apk/repositories
     - apk add postmarketos-base-systemd
