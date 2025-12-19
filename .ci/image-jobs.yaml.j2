@@ -33,6 +33,7 @@ build-packages-{{ arch }}:
 build-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
   stage: build-image
   image: alpine:edge
+  environment: build-image
   tags:
     - {{ arch }}
   needs: [build-packages-{{ arch }}]
@@ -63,6 +64,12 @@ build-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
     - |
       curl -fsSL -o mkosi.version \
       "https://duranium.postmarketos.org/images/${IMAGE_ID}/mkosi.version" 2>/dev/null || echo "" > mkosi.version
+
+    # Install TEST keys for verity partition signing
+    # FIXME: this is obviously not secure
+    - cp "$MKOSI_KEY" mkosi.key
+    - cp "$MKOSI_CRT" mkosi.crt
+    - chmod 600 mkosi.key
 
   script:
     # Note: set workspace dir in /builds so that mkosi doesn't try to work
