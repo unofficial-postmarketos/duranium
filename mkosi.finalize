@@ -7,6 +7,12 @@ sed -i "s/^IMAGE_ID=.*/IMAGE_ID=$PMOS_DEVICE/" "$BUILDROOT/usr/lib/os-release"
 # Add VARIANT_ID for UI
 echo "VARIANT_ID=$PMOS_VARIANT" >> "$BUILDROOT/usr/lib/os-release"
 
+# Add pmOS pub key for sysupdate manifest verify to systemd keyring
+# FIXME: this key is not secure!
+gpg --no-default-keyring \
+   --keyring "$BUILDROOT"/usr/lib/systemd/import-pubring.pgp \
+   --import pmos-sysupdate-public-key.asc
+
 # Remove package manager config, since we don't even want to pretend that this
 # will work
 rm -r "$BUILDROOT"/etc/apk
