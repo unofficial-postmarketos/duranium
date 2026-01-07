@@ -13,9 +13,12 @@ gpg --no-default-keyring \
    --keyring "$BUILDROOT"/usr/lib/systemd/import-pubring.pgp \
    --import pmos-sysupdate-public-key.asc
 
-# Remove package manager config, since we don't even want to pretend that this
-# will work
-rm -r "$BUILDROOT"/etc/apk
+# Remove package manager, since we don't even want to pretend that this
+# will work on immutable installs
+apk add -t apk-tools=999999999
+rm -r "$BUILDROOT"/etc/apk \
+    "$BUILDROOT"/var/cache/apk \
+    "$BUILDROOT"/usr/lib/apk
 
 # Clear out pam.d from factory, this config is installed from systemd and
 # conflicts with config we/Alpine provide
