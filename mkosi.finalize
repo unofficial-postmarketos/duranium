@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e
 
+# mkosi can't preserve setgid shadow when running unprivileged, so we "fix" this
+# by setuid root and in the initramfs set perms to 0. This mimmicks that Fedora
+# does...
+chmod 4755 "$BUILDROOT/usr/sbin/unix_chkpwd"
+
 ## Fixup os-release
 # Fix IMAGE_ID to be device-only (not device_ui_release)
 sed -i "s/^IMAGE_ID=.*/IMAGE_ID=$PMOS_DEVICE/" "$BUILDROOT/usr/lib/os-release"
@@ -31,6 +36,12 @@ for d in etc var opt; do
     cp -a "$BUILDROOT/$d" "$BUILDROOT/usr/share/factory/"
 done
 
+# Fix polkit directory permissions (upstream creates with 750, but mkosi changes
+# group ownership to root)
+if [ -d "$BUILDROOT/usr/share/factory/etc/polkit-1/rules.d" ]; then
+    chmod 755 "$BUILDROOT/usr/share/factory/etc/polkit-1/rules.d"
+fi
+
 # Generate tmpfiles.d config for /etc
 mkdir -p "$BUILDROOT/usr/lib/tmpfiles.d"
 cat > "$BUILDROOT/usr/lib/tmpfiles.d/etc.conf" << 'EOF'
@@ -39,8 +50,8 @@ cat > "$BUILDROOT/usr/lib/tmpfiles.d/etc.conf" << 'EOF'
 # Special cases - copy once
 C /etc/passwd 0644 root root - /usr/share/factory/etc/passwd
 C /etc/group 0644 root root - /usr/share/factory/etc/group
-C /etc/shadow 0640 root shadow - /usr/share/factory/etc/shadow
-C /etc/gshadow 0640 root shadow - /usr/share/factory/etc/gshadow
+C /etc/shadow 0000 root root - /usr/share/factory/etc/shadow
+C /etc/gshadow 0000 root root - /usr/share/factory/etc/gshadow
 f /etc/fstab 0644 root root -
 
 EOF
