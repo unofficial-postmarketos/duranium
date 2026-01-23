@@ -143,6 +143,23 @@ A real world example of a partition label in this format might look like: `pine6
     └── lenovo_21bx_phosh_edge_25071801_arm64.efi+3-0.efi  # Next version with boot counting
 ```
 
+### Android Subpartition Support
+
+**Image Structure:**
+- Duranium builds full disk image with GPT containing: ESP, usr_a, usr_a.verity, usr_a.sig, rootfs
+- Entire disk image flashed to Android's userdata partition, creating nested subpartitions
+- usr_b and related partitions created on first boot by systemd-repart (per existing design)
+
+**Sparse Image Conversion:**
+- mkosi.postoutput converts disk image to Android sparse format using `img2simg`
+- Triggered by `ANDROID_SPARSE_IMAGE` environment variable in device's mkosi.conf
+
+**Boot Chain:**
+- U-Boot in Android boot partition provides UEFI
+- U-Boot uses blkmap to expose subpartitions within userdata (already supported)
+- U-Boot locates ESP subpartition and boots via standard UEFI flow
+- Initramfs handles subpartition discovery and mounting
+
 ## Image Building
 
 This build system uses mkosi profiles to generate images for postmarketOS's many device, UI, and release combinations. Rather than maintaining separate configurations for every possible combination or relying on pmbootstrap/pmaports, three orthogonal profile types (device, UI, release) are composed at build time with mkosi to generate images targeting specific configurations. The 3 profiles are used to generate a unique `ImageId` that describes the device, UI and release combination (see the Version section for more information).
@@ -367,8 +384,6 @@ This uses systemd's factory reset infrastructure, which required systemd >=258) 
 * Migration tool for existing installations? (TBD)
 
 * systemd-homed integration for user home encryption?
-
-* Subpartitions for devices without GPT support
 
 * SecureBoot / trusted booting with signed verity
 
