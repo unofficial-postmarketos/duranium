@@ -3,6 +3,7 @@ ARCH_COMBOS = {
         {"device": "lenovo-21bx", "ui": "cosmic", "release": "edge"},
         {"device": "lenovo-21bx", "ui": "gnome", "release": "edge"},
         {"device": "lenovo-21bx", "ui": "plasma-desktop", "release": "edge"},
+        {"device": "oneplus-enchilada", "ui": "phosh", "release": "edge"},
     ],
     "x86_64": [
         {"device": "generic-x86_64", "ui": "cosmic", "release": "edge"},
