@@ -10,6 +10,10 @@ stages:
   - build-packages
   - build-image
   - deploy-image
+variables:
+  # So that anything that runs install_pmbootstrap and tries to import pmb module
+  # can find it.
+  PYTHONPATH: "/tmp/pmbootstrap"
 
 generate-image-jobs:
   rules:
