@@ -18,10 +18,6 @@ if [ -n "$PROFILES" ] && [ "$1" = "final" ]; then
         mkosi-chroot /usr/bin/install-recommends "$pkg"
     done
 
-    # Remove app manually, because mkosi doesn't have a mechanism to do this
-    # anymore. See: https://github.com/systemd/mkosi/issues/3911
-    mkosi-chroot apk del postmarketos-install-recommends
-
     # Remove install-recommends cache
     rm -rf "$BUILDROOT"/.cache
 fi
