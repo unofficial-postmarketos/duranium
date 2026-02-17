@@ -11,7 +11,6 @@ ARCH_COMBOS = {
         {"device": "generic-x86_64", "ui": "gnome", "release": "edge"},
         {"device": "generic-x86_64", "ui": "plasma-desktop", "release": "edge"},
 
-        {"device": "google-x64cros", "ui": "cosmic", "release": "edge"},
         {"device": "google-x64cros", "ui": "gnome", "release": "edge"},
         {"device": "google-x64cros", "ui": "plasma-desktop", "release": "edge"},
     ],
