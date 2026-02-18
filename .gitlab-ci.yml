@@ -14,6 +14,9 @@ variables:
   # So that anything that runs install_pmbootstrap and tries to import pmb module
   # can find it.
   PYTHONPATH: "/tmp/pmbootstrap"
+  # Number of images to keep per device/ui/release combo, this number includes
+  # the one being built/uploaded!
+  IMAGES_TO_KEEP: 2
 
 generate-image-jobs:
   rules:
