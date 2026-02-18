@@ -46,3 +46,19 @@ rsync -hrvz -e "ssh -p $SSH_PORT" mkosi.output/*/"${IMAGE_ID}"_*.* "$SSH_HOST:/v
 
 # Upload version and manifest
 rsync -hrvz -e "ssh -p $SSH_PORT" mkosi.version SHA256SUMS SHA256SUMS.gpg "$SSH_HOST:/var/www/duranium.postmarketos.org/images/$IMAGE_ID/"
+
+# Generate and upload latest.json
+version=$(cat mkosi.version)
+raw_file="${IMAGE_ID}_${version}.raw.zst"
+sha256=$(grep "  ${IMAGE_ID}_${version}\.raw\.zst$" SHA256SUMS.new | awk '{print $1}')
+cat > latest.json <<EOF
+{
+  "device": "$DEVICE",
+  "ui": "$UI",
+  "release": "$RELEASE",
+  "version": "$version",
+  "filename": "$raw_file",
+  "sha256": "$sha256"
+}
+EOF
+rsync -hrvz -e "ssh -p $SSH_PORT" latest.json "$SSH_HOST:/var/www/duranium.postmarketos.org/images/$IMAGE_ID/"
