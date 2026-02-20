@@ -196,11 +196,6 @@ if [ -d "$BUILDROOT/boot" ]; then
                         mkdir -p "$ARTIFACTDIR/io.mkosi.microcode"
                         mv "$BUILDROOT/boot/$initrd" "$ARTIFACTDIR/io.mkosi.microcode/$initrd"
                         ;;
-                    *)
-                        # Regular initramfs files - use lexicographic naming
-                        INITRD_COUNT=$((INITRD_COUNT + 10))
-                        mv "$BUILDROOT/boot/$initrd" "$ARTIFACTDIR/io.mkosi.initrd/$(printf "%02d" $INITRD_COUNT)-$initrd"
-                        ;;
                 esac
             fi
         done
