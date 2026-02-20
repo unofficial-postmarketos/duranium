@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+
+## Fixup os-release
+# Fix IMAGE_ID to be device-only (not device_ui_release)
+sed -i "s/^IMAGE_ID=.*/IMAGE_ID=$PMOS_DEVICE/" "$BUILDROOT/usr/lib/os-release"
+# Add VARIANT_ID for UI
+echo "VARIANT_ID=$PMOS_VARIANT" >> "$BUILDROOT/usr/lib/os-release"
