@@ -23,7 +23,7 @@ gpg --no-default-keyring \
 apk add -t apk-tools=999999999
 rm -r "$BUILDROOT"/etc/apk \
     "$BUILDROOT"/var/cache/apk \
-    "$BUILDROOT"/usr/lib/apk
+    "$BUILDROOT"/usr/lib/apk || true
 
 # Clear out pam.d from factory, this config is installed from systemd and
 # conflicts with config we/Alpine provide
