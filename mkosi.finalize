@@ -29,6 +29,16 @@ rm -r "$BUILDROOT"/etc/apk \
 # conflicts with config we/Alpine provide
 rm -r "$BUILDROOT/usr/share/factory/etc/pam.d"
 
+# Move /etc/skel to /usr/share/skel so useradd copies real files into ~/
+# rather than symlinks back into the immutable /usr tree. Point useradd
+# at the new location via /etc/default/useradd (which itself becomes an
+# immutable factory symlink, so it gets updated with the /usr images.)
+if [ -d "$BUILDROOT/etc/skel" ]; then
+    mv "$BUILDROOT/etc/skel" "$BUILDROOT/usr/share/"
+    mkdir -p "$BUILDROOT/etc/default"
+    printf 'SKEL=/usr/share/skel\n' >> "$BUILDROOT/etc/default/useradd"
+fi
+
 # Move /etc, /var, and /opt to /usr/share/factory
 mkdir -p "$BUILDROOT/usr/share/factory"
 for d in etc var opt; do
