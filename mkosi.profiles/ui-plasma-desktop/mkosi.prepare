@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+
+# Remove apk integration. We have to use a virtual pkg to do this because the
+# real pkg is pulled in by discover+apk-tools, so it can't be removed by apk
+# will work on immutable installs
+apk add -t discover-backend-apk=999999999
