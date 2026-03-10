@@ -1,30 +1,20 @@
 # Overview
 
-This document outlines an immutable, image-based design of postmarketOS following the concepts from systemd's "Fitting Everything Together" approach.
+This document outlines the design of Duranium, an immutable, image-based variant of postmarketOS following the concepts from systemd's "Fitting Everything Together" approach. Duranium requires systemd.
 
-The design uses mkosi for image building with systemd tooling for A/B updates (systemd-sysupdate), partition management (systemd-repart ), and slot boot selection and automatic fallback on failure (systemd-boot). EFI is chosen as the boot interface because it provides a simple, easy way to configure the OS for booting and integrates seamlessly with the systemd tooling being used. UKI (Unified Kernel Images) enable future secure boot capabilities and simplify image-based updates by bundling kernel, initramfs, cmdline, and DTBs as versioned artifacts. For ARM devices lacking native EFI support (e.g. Android phones), u-boot with EFI capabilities is expected to bridge this gap. While the systemd tooling could (in theory) work standalone with OpenRC, this design currently requires that postmarketOS is built with systemd support enabled.
+Duranium uses mkosi for image building with systemd tooling for A/B updates (systemd-sysupdate), partition management (systemd-repart), and slot boot selection and automatic fallback on failure (systemd-boot). EFI is chosen as the boot interface because it provides a simple, easy way to configure the OS for booting and integrates seamlessly with the systemd tooling being used. UKI (Unified Kernel Images) enable future secure boot capabilities and simplify image-based updates by bundling kernel, initramfs, cmdline, and DTBs as versioned artifacts. For ARM devices lacking native EFI support (e.g. Android phones), u-boot's implemetation of EFI is expected to bridge this gap.
 
 # Features
 
-* **Hermetic /usr**: All OS resources contained in an immutable /usr partition
+* **Immutable, verified /usr**: All OS resources live in a read-only /usr partition, verified at boot with dm-verity. Updates replace the entire partition image atomically.
 
-* **A/B Updates**: Atomic updates via partition switching
+* **A/B updates with automatic rollback**: Two /usr slots allow atomic updates via systemd-sysupdate. If a new image fails to boot, systemd-boot automatically falls back to the previous slot.
 
-* **Factory Reset**: Easy restoration to known-good state
+* **Factory reset**: Wipe the rootfs and re-enter first boot setup. Triggered from an authenticated session via an EFI variable.
 
-* **Image-based**: Move from package-based to image-based deployment
+* **Encrypted by default**: Rootfs is always created on a LUKS volume. Users can set a custom passphrase during first boot or later.
 
-* **dm-verity**: Cryptographic integrity verification of /usr partition
-
-* **Encrypted rootfs**: LUKS encryption for user data protection
-
-* **UKI/Type 2 booting**: Unified kernel images with embedded initramfs and DTBs
-
-* **Remote HTTP updates**: OTA updates via systemd-sysupdate from remote servers
-
-* **First-boot provisioning**: Initial setup wizard assists user with creating account
-
-* Release switching: sysupdate config changed in /etc to switch to new release or a different UI
+* **First-boot provisioning**: On first boot, a setup wizard handles user account creation and optional FDE passphrase configuration.
 
 # System Architecture
 
@@ -36,19 +26,19 @@ Type 1 Boot, where the kernel, initramfs, dtbs are separate files in the ESP, ma
 
 * **No ESP Update Mechanism**: mkosi uses kernel version paths (`/postmarketOS/6.15.8-0-stable/`) not IMAGE_VERSION. This means that boot artifacts (kernel) are not coupled with usr partition versions for sysupdate. In other words, it means that /usr/lib/modules may not match the booted kernel, and this is bad.
 
-* **Verity Hash Timing**: `mkosi.finalize` runs before verity calculation, and `mkosi.postoutput` runs after the ESP partition is finalized/exported, so there's no scriptable point where the usrhash can be injected into the cmdline manually. Using mkosi's kernel-install mechanism isn't possible either since it writes to paths using kernel versions, and not IMAGE_VERSION. Given the previously mentioned issue, when sysupdate updates the usr partition, the loader config in the ESP will have a stale `usrhash=` value. Stale `usrhash=` values in the kernel cmdline break dm-verity.
+* **Verity Hash Timing**: `usrhash=` must be passed on the kernel cmdline, the value of this is only available **after** the usr partition is created and finished. For type 2, mkosi automatically creates and injects this into the kernel cmdline in the UKI, but for type 1 there is no point where this can be done. `mkosi.finalize` runs before verity calculation, and `mkosi.postoutput` runs after the ESP partition is finalized/exported, so there's no scriptable point where the usrhash can be injected into the cmdline manually. Using mkosi's kernel-install mechanism isn't possible either since it writes to paths using kernel versions, and not IMAGE_VERSION. Given the previously mentioned issue, when sysupdate updates the usr partition, the loader config in the ESP will have a stale `usrhash=` value. Stale `usrhash=` values in the kernel cmdline break dm-verity.
 
 * **Complex sysupdate.transfer config**: Trying to create an ESP layout with versioned Type 1 artifacts and a sysupdate config that can manage them all (so they can get updated) is difficult and fragile.
 
 * **No SecureBoot Support**: While SecureBoot is not a requirement for an immutable pmOS, choosing a boot implementation that doesn't really support it will make supporting it more difficult in the future.
 
-### Why UKI makes sense
+### Why UKI
 
 UKI resolves/avoids all Type 1 limitations when using mkosi for image creation and sysupdate for image-based updates:
 
 * **Automatic Verity**: mkosi injects `usrhash=` into UKI cmdline during build automatically, no need to patch mkosi to do this
 
-* **Proper Versioning**: UKI files use versioning compatible with other sysupdated artifacts, with boot counting (e.g. `p64_pho_phosh_edge_24011501_arm64.efi+3-0.efi`), the same versioning is used to couple UKI with the correct usr partition for module loading.
+* **Proper Versioning**: UKI files use versioning compatible with other sysupdated artifacts, with boot counting (e.g. `oneplus-enchilada_gnome-mobile_edge_26012901+3-0.efi`), the same versioning is used to couple UKI with the correct usr partition for module loading.
 
 * **Easy sysupdate.transfer config**: Single .efi file contains kernel + initramfs + cmdline + DTB(s), updated atomically by sysupdate, and the sysupdate.transfer configuration to handle this is very simple and straightforward.
 
@@ -56,15 +46,15 @@ UKI resolves/avoids all Type 1 limitations when using mkosi for image creation a
 
 ### Supported Device Boot Scenarios
 
-This uses boot-deploy's existing DTB resolution logic (by reading the sd-boot configuration boot-deploy generates) rather than reimplementing deviceinfo parsing, and doesn't seem to introduce any blockers to later SecureBoot compatibility.
+DTB loading is handled by embedding devicetrees as `.dtbauto` sections in the UKI, where systemd-stub selects the correct one at boot by matching the `compatible` string from the EFI configuration table. mkosi handles the DTB embedding during image build.
 
-* **u-boot + explicit DTB**: boot-deploy resolves DTB from deviceinfo, this dtb is embedded in UKI `.dtbauto` and copied to `/dtbs/` in the ESP for u-boot
+* **u-boot + explicit DTB**: DTB from deviceinfo is embedded in UKI `.dtbauto` and copied to `/dtbs/` in the ESP for u-boot
 
 * **u-boot + auto-detect**: u-boot provides DTB from internal logic, so embed all `/dtbs/` in UKI
 
-* **WoA + explicit DTB**: boot-deploy resolves DTB from deviceinfo, this dtb is embedded in the UKI + copied to `/dtbs/` in the ESP for dtbloader
+* **WoA + explicit DTB**: DTB from deviceinfo is embedded in the UKI
 
-* **WoA + auto-detect**: dtbloader detects from `/dtbs` OR `/dtbs` is missing, embed all `/dtbs/` in UKI
+* **WoA + auto-detect**: embed all `/dtbs/` in UKI
 
 * **ACPI devices**: No DTB sections in UKI, normal ACPI boot
 
@@ -84,7 +74,7 @@ os-release is used to set a variety of parameters for images:
 
 * `IMAGE_VERSION`: Contains a build date code and increment, e.g. `25110402`
 
-* **mkosi**: Uses ImageId (from build-image.py) for output filenames, but `IMAGE_ID` in `os-release`, used by repart for partition labels and sysupdate for matching, is overwritten in `mkosi.finalize` to only specify the device name.
+* **mkosi**: Uses ImageId (from build-image.py) for output filenames, but `IMAGE_ID` in `os-release` and `initrd-release`, used by repart for partition labels, sysupdate for matching, and factory reset, are overwritten in `mkosi.finalize` to only specify the device name.
 
 * **sysupdate**: Uses these to identify when updates are available. Sysupdate uses the `IMAGE_ID`+`IMAGE_VERSION` stored in the GPT partition name to determine which partition to preserve and which one to install an image update to. Sysupdate also requires that newer image updates have an version that's higher than the currently active image. Sysupdate uses all of these variables from os-release to search for updates. Modifying `VARIANT_ID` and/or `VERSION_ID` in `/etc/os-release` after image installation and running sysupdate allows one to switch to a different UI or release, respectively.
 
@@ -105,7 +95,7 @@ A real world example of a partition label in this format might look like: `pine6
 
 **Initial shipped image:**
 
-1. ESP (EFI System Partition) with systemd-boot, UKI, DTBs (for dtbloader/u-boot compatibility, separate from UKI-embedded DTBs)
+1. ESP (EFI System Partition) with systemd-boot, UKI, DTBs (for u-boot compatibility, separate from UKI-embedded DTBs)
 
 2. /usr partition (version A) - immutable, labeled with image version
 
@@ -121,48 +111,29 @@ A real world example of a partition label in this format might look like: `pine6
 
 3. Verity signature partition for /usr (version B)
 
-4. Root filesystem - encrypted with LUKS (optional)
+4. Root filesystem - encrypted with LUKS (blank passphrase by default)
 
 ### ESP Layout for UKI
 
 ```
-/boot/efi/
+/boot/
 ├── efi/                                               # installed once, not managed by A/B updates
 │   ├── boot/
 │   │   └── bootaa64.efi                               # systemd-boot
 │   └── systemd/
-│       └── drivers/
-│           └── dtbloaderaa64.efi                      # Optional, for WoA devices
-├── dtbs/                                              # Device detection DTBs (unversioned)
+├── dtbs/                                              # Device detection DTBs (optional, unversioned)
 │   ├── qcom/
 │   │   ├── sc8280xp-lenovo-thinkpad-x13s.dtb
 │   │   └── ...
 │   └── ...
 └── EFI/Linux/
-    ├── lenovo_21bx_phosh_edge_25071501_arm64.efi          # UKI (dtb(s) in dtbauto sections)
-    └── lenovo_21bx_phosh_edge_25071801_arm64.efi+3-0.efi  # Next version with boot counting
+    ├── lenovo-21bx_phosh_edge_25071501.efi            # UKI (dtb(s) in dtbauto sections)
+    └── lenovo-21bx_phosh_edge_25071801.efi+3-0.efi    # Next version with boot counting
 ```
-
-### Android Subpartition Support
-
-**Image Structure:**
-- Duranium builds full disk image with GPT containing: ESP, usr_a, usr_a.verity, usr_a.sig, rootfs
-- Entire disk image flashed to Android's userdata partition, creating nested subpartitions
-- usr_b and related partitions created on first boot by systemd-repart (per existing design)
-
-**Sparse Image Conversion:**
-- mkosi.postoutput converts disk image to Android sparse format using `img2simg`
-- Triggered by `ANDROID_SPARSE_IMAGE` environment variable in device's mkosi.conf
-
-**Boot Chain:**
-- U-Boot in Android boot partition provides UEFI
-- U-Boot uses blkmap to expose subpartitions within userdata (already supported)
-- U-Boot locates ESP subpartition and boots via standard UEFI flow
-- Initramfs handles subpartition discovery and mounting
 
 ## Image Building
 
-This build system uses mkosi profiles to generate images for postmarketOS's many device, UI, and release combinations. Rather than maintaining separate configurations for every possible combination or relying on pmbootstrap/pmaports, three orthogonal profile types (device, UI, release) are composed at build time with mkosi to generate images targeting specific configurations. The 3 profiles are used to generate a unique `ImageId` that describes the device, UI and release combination (see the Version section for more information).
+This build system uses mkosi profiles to generate images for postmarketOS's many device, UI, and release combinations. Rather than maintaining separate configurations for every possible combination or relying on pmbootstrap/pmaports, two orthogonal profile types (device, UI) are composed at build time with mkosi to generate images targeting specific configurations. Release is configured via mkosi's `Release=` setting (defaulting to `edge`, overridable with `--release=`). The profiles and release are used to generate a unique `ImageId` that describes the device, UI and release combination (see the Version section for more information).
 
 The profiles themselves are quite simple, often just including a single package, but mkosi is quite flexible and they would be expanded to do more stuff later if necessary for building images for a specific device.
 
@@ -176,7 +147,7 @@ The profiles themselves are quite simple, often just including a single package,
 
 4. Wrapper validates exactly one profile of each type is provided
 
-5. Wrapper generates composite `ImageId` from device, UI profile names and release. The format for this is: `{device}_{ui}_{release}`
+5. Wrapper generates composite `ImageId` from device and UI profile names, and release (from `--release=` flag, defaulting to `edge`). The format for this is: `{device}_{ui}_{release}`
 
 6. Wrapper invokes mkosi with `ImageId` and profiles, and passes (for `mkosi.finalize` ) `--environment=PMOS_VARIANT` and `--environment=PMOS_DEVICE`.
 
@@ -190,19 +161,25 @@ The profiles themselves are quite simple, often just including a single package,
 
 ```
 mkosi.profiles/
-├── device-pine64-pinephone/
+├── compressed/
 │   └── mkosi.conf
-├── device-samsung-galaxy-s4-mini/
+├── device-oneplus-enchilada/
 │   └── mkosi.conf
-├── ui-plasma-mobile/
+├── device-qemu-aarch64/
 │   └── mkosi.conf
-├── ui-gnome-mobile/
+├── device-generic-x86_64/
+│   └── mkosi.conf
+├── ui-console/
 │   └── mkosi.conf
 ├── ui-phosh/
+│   └── mkosi.conf
+├── ui-plasma-mobile/
 │   └── mkosi.conf
 ```
 
 ### Deploying on HTTP server
+
+The postmarketOS infra is currently hosting images at https://duranium.postmarketos.org. The information below is included in case this needs to change in the future. For now, images are being built and pushed there automatically by gitlab CI. See here for more info: https://gitlab.postmarketos.org/postmarketOS/duranium/-/issues/6
 
 sysupdate is configured to query/fetch image updates from a remote HTTP server. Images should be laid out on the server under directories named after the image's `ImageId`, and each `ImageId` directory should contain a file `SHA256SUMS` that serves as a manifest of available images for sysupdate along with a checksum of the image files. This manifest should be signed (`SHA256SUMS.gpg`), and the public key included in images created by mkosi so that they can be verified at runtime.
 
@@ -212,21 +189,21 @@ An example layout might look something like this:
 
 ```
 qemu-aarch64_console_edge/
-├── qemu-aarch64_console_edge_25081111_arm64.efi
-├── qemu-aarch64_console_edge_25081111_arm64.usr-arm64-verity-sig.e57b459d4a3f4260805fb3481f99b1de.raw.xz
-├── qemu-aarch64_console_edge_25081111_arm64.usr-arm64-verity.4c62010a14dda6d767e3108092367651.raw.xz
-├── qemu-aarch64_console_edge_25081111_arm64.usr-arm64.77415c80aa85f09c68ab25fba2481fa2.raw.xz
-├── qemu-aarch64_console_edge_25081111_arm64.efi
-├── qemu-aarch64_console_edge_25082001_arm64.usr-arm64-verity-sig.1ed99882ef219b02a5a5dcd0e8127161.raw.xz
-├── qemu-aarch64_console_edge_25082001_arm64.usr-arm64-verity.5d8faa5c7560e499080bd6993ed67359.raw.xz
-├── qemu-aarch64_console_edge_25082001_arm64.usr-arm64.60c62c8db2a1c111ad9d53fe69a74074.raw.xz
+├── qemu-aarch64_console_edge_25081111.efi
+├── qemu-aarch64_console_edge_25081111.usr-arm64-verity-sig.e57b459d4a3f4260805fb3481f99b1de.raw.xz
+├── qemu-aarch64_console_edge_25081111.usr-arm64-verity.4c62010a14dda6d767e3108092367651.raw.xz
+├── qemu-aarch64_console_edge_25081111.usr-arm64.77415c80aa85f09c68ab25fba2481fa2.raw.xz
+├── qemu-aarch64_console_edge_25082001.efi
+├── qemu-aarch64_console_edge_25082001.usr-arm64-verity-sig.1ed99882ef219b02a5a5dcd0e8127161.raw.xz
+├── qemu-aarch64_console_edge_25082001.usr-arm64-verity.5d8faa5c7560e499080bd6993ed67359.raw.xz
+├── qemu-aarch64_console_edge_25082001.usr-arm64.60c62c8db2a1c111ad9d53fe69a74074.raw.xz
 ├── SHA256SUMS
 ├── SHA256SUMS.gpg
 pine64-pinephonepro_phosh_edge/
-├── pine64-pinephonepro_phosh_edge_25081111_arm64.efi
-├── pine64-pinephonepro_phosh_edge_25081111_arm64.usr-arm64-verity-sig.6cc10fdd3e5ac8377defe389c21c47d6.raw.xz
-├── pine64-pinephonepro_phosh_edge_25081111_arm64.usr-arm64-verity.e07910a06a086c83ba41827aa00b26ed.raw.xz
-├── pine64-pinephonepro_phosh_edge_25081111_arm64.usr-arm64.34c5f9b2cd3e1504604d186a190cbaaf.raw.xz
+├── pine64-pinephonepro_phosh_edge_25081111.efi
+├── pine64-pinephonepro_phosh_edge_25081111.usr-arm64-verity-sig.6cc10fdd3e5ac8377defe389c21c47d6.raw.xz
+├── pine64-pinephonepro_phosh_edge_25081111.usr-arm64-verity.e07910a06a086c83ba41827aa00b26ed.raw.xz
+├── pine64-pinephonepro_phosh_edge_25081111.usr-arm64.34c5f9b2cd3e1504604d186a190cbaaf.raw.xz
 ├── SHA256SUMS
 ├── SHA256SUMS.gpg
 ```
@@ -235,103 +212,53 @@ A mkosi profile, `compressed`, will automatically compress the usr+verity partit
 
 ## Booting
 
-As mentioned previously, EFI is required for booting in this design. Devicetree handling, where u-boot or dtbloader are used, and "generic" kernels (i.e. support multiple devices) were considered.
+As mentioned previously, EFI is required for booting Duranium.
 
-* **DTB devices**: UKI contains multiple `.dtbauto` sections with all required DTBs embedded. U-boot and dtbloader look for dtbs in well known paths in the ESP (e.g. `/dtbs`) so in addition to embedding dtbs, dtb files will be maintained in this path too.
+* **DTB devices**: UKI contains multiple `.dtbauto` sections with all required DTBs embedded. U-boot looks for dtbs in well known paths in the ESP (e.g. `/dtbs`) so in addition to embedding dtbs, dtb files will be maintained in this path too.
 
 * **ACPI devices**: Standard UKI without DTB sections, relies on firmware-provided ACPI
 
 ### Pre-kernel Boot Flow
 
-1. **Device Detection**: dtbloader (WoA) or u-boot reads DTBs from `/dtbs/` to identify device and set `compatible` string via EFI configuration table. These are unversioned, and not updated by sysupdate, and this is fine since they only serve to assist u-boot or dtbloader with selecting the correct dtb embedded in a (versioned) UKI. This is not applicable for devices that support ACPI.
+1. **systemd-boot**: selects boot entries by sorting UKI files by version and boot count status. Entries without counters (successful boots) are preferred, followed by entries with tries remaining (+N suffix), then entries with zero tries left (marked bad).
 
-2. **systemd-boot**: selects boot entries by sorting UKI files by version and boot count status. Entries without counters (successful boots) are preferred, followed by entries with tries remaining (+N suffix), then entries with zero tries left (marked bad).
+2. **DTB Matching**: systemd-stub reads `compatible` from EFI table, finds matching `.dtbauto` section in UKI, replaces temporary DTB with version-matched one. This is not applicable for devices that support ACPI.
 
-3. **DTB Matching**: systemd-stub reads `compatible` from EFI table, finds matching `.dtbauto` section in UKI, replaces temporary DTB with version-matched one. This is not applicable for devices that support ACPI.
+3. **Kernel Launch**: Boot proceeds with kernel boot
 
-4. **Kernel Launch**: Boot proceeds with kernel boot
+### Initramfs
 
-### Initramfs Boot Flows
+The initramfs is built by mkosi and runs systemd as init. This replaced an earlier POC approach that modified the pmOS mkinitfs-generated initramfs, which was complicated and buggy. Switching to the mkosi initramfs solved several outstanding issues, particularly around disk detection (systemd in the initramfs sets up disks/partitions and the state persists seamlessly into the rootfs after switch-root).
 
-For first boot configuration, a new wizard application that runs from the initramfs will be created, named f0rmz. It's based on the buffybox/unl0kr codebase. In the flows below, rootfs encryption is optional and if it's not enabled then any steps explicitly listing encryption or decryption would be skipped.
+All boot logic (first boot, normal boot, factory reset) is implemented as systemd units in the initramfs. systemd handles /usr partition + dm-verity setup automatically via `usrhash=` in the kernel cmdline. For Android devices with nested subpartitions, a systemd unit runs early in boot to scan and initialize them (using the same logic from the pmOS initramfs).
 
-Brief overview: initramfs starts → detect if first boot and handle it → parse usrhash= and verify /usr with dm-verity → mount, create or decrypt rootfs → switchroot
-
-**First boot flow:**
-
-1. Detect root missing
-
-2. Run f0rmz to prompt user for username, passwords, encryption choice
-
-3. Create repart config with encryption passphrase from user
-
-4. Run systemd-repart with passphrase to create rootfs
-
-5. Mount root
-
-6. Create new user account, configure password
-
-7. Run `systemd-firstboot --root=/sysroot`
-
-8. switchroot
-
-**Factory reset flow:**
-
-1. Detect factory reset flag
-
-2. Run systemd-repart to delete partitions marked `FactoryReset=yes` (e.g. rootfs)
-
-3. First boot logic is triggered since no rootfs exists. f0rmz has a shutdown option
-
-4. If user chooses to continue, proceed with first boot flow above, otherwise device shuts down with user data wiped
+`mkosi.finalize` patches `initrd-release` in the initramfs with the correct `IMAGE_ID` and related variables, which is necessary for factory reset to work, since systemd-repart compares the IMAGE_ID in the EFI variable with the value in `/etc/initrd-release` to make sure it's resetting the correct OS.
 
 **Normal boot flow:**
 
-1. Detect existing root partition
+1. Subpartitions scanned/initialized (if applicable)
 
-2. Unlock and mount root
+2. systemd detects LUKS partition for root. unl0kr is configured as a password agent for systemd to unlock it.
 
-3. switchroot
+3. systemd automatically handles /usr partition + dm-verity setup
 
-## Initramfs Changes Required
+4. switchroot
 
-* **Immutable Install Detection**: The presence of `usrhash=` in kernel cmdline is used to detect when initramfs is running for an immutable install or not. This commandline option is only used for dm-verity, so it shouldn't appear in the cli unless dm-verity is being used (i.e. an immutable install boot). The changes in this section **MUST** preserve existing initramfs logic for mutable installs and non-EFI devices, immutable logic is only used when `usrhash=` is present.
+**First boot flow:**
 
-* **Boot Device and Root Discovery**: The EFI variable `LoaderDevicePartUUID` is used to get the block device containing the booted ESP. This device is then searched for a rootfs matching the partition type for the system architecture, following the UAPI Discoverable Partition Spec (DPS). Other existing logic in the initramfs for rootfs discovery, e.g. for handling subpartitions/Android logic is not used.
+1. systemd-repart in the initramfs creates missing partitions (B-slot usr + verity, and rootfs). Rootfs is always created on a LUKS volume with a default blank passphrase.
 
-* **Early Boot Decision Making**: For immutable installs, attempt to mount root partition early and check for `/etc/os-release` existence to distinguish:
+2. Subpartitions scanned/initialized (if applicable), then systemd switches root
 
-  * **First Boot**: No root partition or empty partition (missing `/etc/os-release`)
+3. f0rmz runs in the rootfs, triggered by a sentinel file under `/etc`. It creates the user account and optionally sets a custom LUKS passphrase (replacing the blank passphrase set by repart). f0rmz was chosen over UI-specific first boot tools (gnome-initial-setup, Plasma setup) because it allows prompting for and setting a FDE passphrase, and is UI-agnostic. f0rmz is based on the buffybox/unl0kr codebase and is still incomplete.
 
-  * **Factory Reset**: Existing partition but empty after systemd-repart factory reset
+**Factory reset flow:**
 
-  * **Normal Boot**: Populated partition with `/etc/os-release` present, implies this is after first rootfs boot of install (since /etc is populated)
+1. Triggered from the rootfs, e.g. `systemctl start systemd-factory-reset-request && reboot`. This sets the `FactoryResetRequest` EFI variable with OS data from `/etc/os-release`.
 
-* **Parse usrhash= from cmdline and set up dm-verity verified /usr**
+2. On next boot, systemd-repart in the initramfs detects the EFI variable, deletes the rootfs, and recreates it
 
-  * usrhash contains the partition UUID in the first 128-bits, this will be used to locate the correct usr partition (A or B)
-
-  * Extract UUIDs for both /usr and verity partitions from usrhash value
-
-  * Set up dm-verity mapping then mount /usr
-
-* **Two-Stage Repart Flow for First Boot/Factory Reset:**
-
-  1. Check for `FactoryReset` EFI variable at `/sys/firmware/efi/efivars/FactoryReset-8cf2644b-4b0b-428f-9387-6d876050dc67`
-
-  * NOTE: systemd-258 deprecates this var in favor of `FactoryResetRequest`
-
-  1. systemd-repart handles factory reset (deletes partitions marked `FactoryReset=yes`) if EFI variable present
-
-  2. rootfs created by repart is deleted. If this isn't done, then running repart again to enable encryption does not work as intended because repart will not modify an existing partition, and at this point in the flow we do not know if the user wants to enable encryption.
-
-  3. Run f0rmz for gathering user configuration (username, passwords, encryption choice)
-
-  4. systemd-repart creates/configures partitions based on user input
-
-  5. Create user account, run `systemd-firstboot --root=/sysroot`
-
-  6. Continue normal initramfs boot with root partition
+3. Boot proceeds as first boot
 
 ## Populating /etc
 
@@ -361,99 +288,28 @@ While building an image, tmpfiles.d configuration is generated to create a hybri
 
 * **Create empty**: `fstab` using tmpfiles.d "f" directive
 
+* **Skeleton directory**: `/etc/skel` is moved to `/usr/share/skel` at build time so that `useradd` copies real files into `~/` rather than symlinks back into the immutable /usr tree. `/etc/default/useradd` is configured with `SKEL=/usr/share/skel` to point at the new location.
+
 ## Factory Reset
 
 Some other immutable OS designs using systemd tooling (e.g. ParticleOS) use a kernel command line parameter to trigger a factory reset condition. This is accomplished by building a UKI with a profile to add this parameter and named something like "Factory Reset", and the bootloader (systemd-boot) exposes this option in the boot menu. Having this as a boot menu option could lead to an accidental (or malicious) factory reset of the device, since it doesn't require any authentication to select this boot option and could be done unintentionally with a misplaced click/button press. There's also some risk that this option might be auto-selected by the bootloader! In the best case this is inconvenient if the user has good backups, but a more likely worst case is unrecoverable loss of data.
 
-To help avoid this situation, this design will instead rely on setting an EFI variable that systemd-repart supports for triggering a factory reset. This variable is typically set from within an authenticated OS session, and could be wrapped behind a GUI application in userspace to make it user-friendly. SecureBoot further limits the scope where this variable could be set.
+To help avoid this situation, this design relies on systemd's factory reset infrastructure to set an EFI variable that systemd-repart detects on the next boot. The variable is set from within an authenticated OS session (e.g. via `systemd-factory-reset-request.service`), and could be wrapped behind a GUI application in userspace to make it user-friendly. SecureBoot further limits the scope where this variable could be set.
 
-This uses systemd's factory reset infrastructure, which required systemd >=258) <https://www.freedesktop.org/software/systemd/man/devel/systemd-factory-reset.html>
+This uses systemd's factory reset infrastructure (requires systemd >=258) <https://www.freedesktop.org/software/systemd/man/devel/systemd-factory-reset.html>
 
 **Flow:**
 
-1. User triggers factory reset from authenticated OS session (using systemd-factory-reset, or a GUI that calls into it)
+1. User triggers factory reset from authenticated OS session (e.g. `systemctl start systemd-factory-reset-request`, or a GUI that calls into it)
 
-2. systemd-factory-reset sets the `FactoryResetRequest` EFI variable which the initramfs/repart will detect on the next boot to trigger the reset process.
+2. The `FactoryResetRequest` EFI variable is set, which the initramfs/repart will detect on the next boot to trigger the reset process.
 
 3. System is rebooted
 
-4. See info above about Initramfs Changes Required for exact flow of factory reset in the initramfs
-
-# Open Questions / Future Work
-
-* Migration tool for existing installations? (TBD)
-
-* systemd-homed integration for user home encryption?
-
-* SecureBoot / trusted booting with signed verity
-
-* TPM2 support where available
-
-* U-Boot with EFI support for ARM devices
-
-* Get rid of /esp/dtbs:
-
-  * ensure u-boot always provides it's dtb if none is found on esp
-
-  * update dtbloader to generate stub dtb for supported devices
-
-* Or support dtbloader for auto-loading device-trees
-
-  * Doesn't work with versioned artifacts in ESP
-
-  * Casey working on proposal to BLS to make this possible
-
-* Investigate using mkosi's kernel-install implementation for generating/installing boot artifacts
-
-  * This installs artifacts in the esp using kernel version, not image version so not really possible to sysupdate and couple with usr partition updates
-
-  * This may not be desired/necessary after all if we stick with UKI
-
-* Update mechanism for ESP/efi (systemd-boot, dtbloader, etc)
-
-  * E.g. bootupctl from silverblue?
-
-* What do to about pmb_recommends and pmb_select?
-
-  * mkosi building images doesn't include packages listed here
-
-  * abuild doesn't include them either, for obvious reasons
-
-  * These packages are no longer 'optional dependencies' in the context of an immutable image, so maybe we should build an "immutable" subpackage for packages that have these where `depends=$_pmb_recommend` and have that get pulled in automatically?
-
-* Generate basic repart config from deviceinfo (filesystem only)
-
-  * No one seems to be using deviceinfo_root_filesystem in pmaports...
-
-* Create a UX-friendly GUI app for triggering a factory reset from within the OS on next boot
-
-  * should allow canceling the request
-
-  * should give an option to reboot now/immediately to process the request
-
-* Could this project help simplify managing BLS-compliant ESP? <https://github.com/AerynOS/blsforme>
-
-* Partition sizing - updates vs wasted space:
-
-  * Conservative sizing wastes space but prevents update failures.
-
-  * Aggressive sizing risks future updates being too large for target partitions.
-
-  * Particularly problematic on storage-constrained devices.
-
-* Image building, on bpo or ??
-
-  * Manifest (and images?) should be signed so they can be verified by sysupdate, keys will need to be baked into the image
-
-## Dependencies
-
-* Extended unl0kr for first boot UI (pmaports#2776)
-
-* mkosi support for pmOS (mkosi#3781)
+4. See Initramfs section above for the factory reset boot flow
 
 ## References
 
 * [Fitting Everything Together](https://0pointer.net/blog/fitting-everything-together.html)
 
 * [ParticleOS](https://github.com/particle-iot/particle-os)
-
