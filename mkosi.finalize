@@ -116,10 +116,6 @@ cat > "$BUILDROOT/usr/lib/tmpfiles.d/etc.conf" << 'EOF'
 # Populate /etc from factory defaults (auto-generated)
 
 # Special cases - copy once
-C /etc/passwd 0644 root root - /usr/share/factory/etc/passwd
-C /etc/group 0644 root root - /usr/share/factory/etc/group
-C /etc/shadow 0000 root root - /usr/share/factory/etc/shadow
-C /etc/gshadow 0000 root root - /usr/share/factory/etc/gshadow
 f /etc/fstab 0644 root root -
 
 EOF
