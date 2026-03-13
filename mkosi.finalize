@@ -104,6 +104,13 @@ for d in etc var opt; do
     cp -a "$BUILDROOT/$d" "$BUILDROOT/usr/share/factory/"
 done
 
+# passwd, group, shadow, and gshadow are all managed by systemd-sysusers at
+# runtime. The buildroot copies contain stale UIDs and must not be used
+rm -f "$BUILDROOT/usr/share/factory/etc/shadow" \
+      "$BUILDROOT/usr/share/factory/etc/gshadow" \
+      "$BUILDROOT/usr/share/factory/etc/passwd" \
+      "$BUILDROOT/usr/share/factory/etc/group"
+
 # Fix polkit directory permissions (upstream creates with 750, but mkosi changes
 # group ownership to root)
 if [ -d "$BUILDROOT/usr/share/factory/etc/polkit-1/rules.d" ]; then
