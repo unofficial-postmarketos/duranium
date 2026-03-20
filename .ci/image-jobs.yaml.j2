@@ -16,7 +16,7 @@ build-packages-{{ arch }}:
   before_script:
     - apk add curl
     - "echo '140.211.167.182 gitlab.postmarketos.org' >> /etc/hosts"
-    - curl -4fsSL "https://gitlab.postmarketos.org/postmarketOS/ci-common/-/raw/master/install_pmbootstrap.sh" | sh
+    - curl -4fsSL "https://gitlab.postmarketos.org/postmarketOS/ci-common/-/raw/main/install_pmbootstrap.sh" | sh
     - su pmos -c "cd ~/.local/var/pmbootstrap/cache_git/pmaports && git checkout craftyguy/duranium-support"
   script:
     - su pmos -c "cd ~/.local/var/pmbootstrap/cache_git/pmaports && ./.ci/build-{{ arch }}.sh"
@@ -59,8 +59,8 @@ build-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
 
     # convert to pmOS
     - ln -sf /usr/share/distribution-gpg-keys/postmarketos/build.postmarketos.org.rsa.pub /etc/apk/keys
-    - echo "http://mirror.postmarketos.org/postmarketos/extra-repos/systemd/master" >> /etc/apk/repositories
-    - echo "http://mirror.postmarketos.org/postmarketos/master" >> /etc/apk/repositories
+    - echo "http://mirror.postmarketos.org/postmarketos/extra-repos/systemd/main" >> /etc/apk/repositories
+    - echo "http://mirror.postmarketos.org/postmarketos/main" >> /etc/apk/repositories
     - apk add postmarketos-base-systemd
     - apk add postmarketos-base
 
