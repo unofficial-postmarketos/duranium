@@ -51,8 +51,8 @@ ssh -p "$SSH_PORT" "$SSH_HOST" "mkdir -p /var/www/duranium.postmarketos.org/imag
 # Upload images
 rsync -hrvz -e "ssh -p $SSH_PORT" mkosi.output/*/"${ARTIFACT_PREFIX}"_*.* "$SSH_HOST:/var/www/duranium.postmarketos.org/images/$DEPLOY_DIR/"
 
-# Upload version and manifest
-rsync -hrvz -e "ssh -p $SSH_PORT" mkosi.version SHA256SUMS SHA256SUMS.gpg "$SSH_HOST:/var/www/duranium.postmarketos.org/images/$DEPLOY_DIR/"
+# Upload manifest
+rsync -hrvz -e "ssh -p $SSH_PORT" SHA256SUMS SHA256SUMS.gpg "$SSH_HOST:/var/www/duranium.postmarketos.org/images/$DEPLOY_DIR/"
 
 # Generate and upload latest.json (OS images only)
 if [ -n "$DEVICE" ]; then

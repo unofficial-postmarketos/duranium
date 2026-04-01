@@ -4,8 +4,29 @@
 
 stages:
   - build-packages
+  - determine-version
   - build-image
   - deploy-image
+
+determine-version:
+  stage: determine-version
+  environment: deploy
+  image: alpine:edge
+  resource_group: global-version
+  before_script:
+    # mkosi is in testing repo
+    - echo "https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
+    - apk add mkosi openssh-client
+    - |
+      mkdir -p "$HOME"/.ssh
+      echo "$SSH_HOST_KEY" > "$HOME"/.ssh/known_hosts
+      echo "$SSH_PRIVATE_KEY" > "$HOME"/.ssh/id_ed25519
+      chmod 600 "$HOME"/.ssh/id_ed25519
+  script:
+    - .ci/determine-version.sh
+  artifacts:
+    paths:
+      - mkosi.version
 
 {% for arch, combos in image_combos.items() %}
 build-packages-{{ arch }}:
@@ -36,7 +57,9 @@ build-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
   environment: build-image
   tags:
     - {{ arch }}
-  needs: [build-packages-{{ arch }}]
+  needs:
+    - determine-version
+    - build-packages-{{ arch }}
   before_script:
     - apk upgrade -a
     # mkosi is in testing repo
@@ -67,10 +90,6 @@ build-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
     # Generate image ID for this device+ui+release combo
     - export IMAGE_ID="${DEVICE}_${UI}_${RELEASE}"
 
-    - |
-      curl -fsSL -o mkosi.version \
-      "https://duranium.postmarketos.org/images/${IMAGE_ID}/mkosi.version" 2>/dev/null || echo "" > mkosi.version
-
     # Install TEST keys for verity partition signing
     # FIXME: this is obviously not secure
     - cp "$MKOSI_KEY" mkosi.key
@@ -85,8 +104,7 @@ build-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
         --release=$RELEASE \
         --package-directory packages \
         --workspace-directory=/builds/mkosi-workspace \
-        --profile=compressed \
-        --auto-bump
+        --profile=compressed
   artifacts:
     expire_in: 1 day
     paths:
