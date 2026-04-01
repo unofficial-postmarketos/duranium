@@ -1,4 +1,4 @@
-ARCH_COMBOS = {
+IMAGE_COMBOS = {
     "aarch64": [
         {"device": "fairphone-fp5", "ui": "phosh", "release": "edge"},
         {"device": "fairphone-fp5", "ui": "plasma-mobile", "release": "edge"},

@@ -7,7 +7,7 @@ stages:
   - build-image
   - deploy-image
 
-{% for arch, combos in arch_combos.items() %}
+{% for arch, combos in image_combos.items() %}
 build-packages-{{ arch }}:
   stage: build-packages
   image: alpine:edge
