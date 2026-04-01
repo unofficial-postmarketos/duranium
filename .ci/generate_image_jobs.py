@@ -4,7 +4,7 @@ from pathlib import Path
 from jinja2 import Template
 
 sys.path.insert(0, str(Path(__file__).parent))
-from combos import IMAGE_COMBOS
+from config import IMAGE_COMBOS
 
 if len(sys.argv) != 3:
     print("usage: generate_image_jobs.py TEMPLATE OUTPUT")
