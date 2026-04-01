@@ -118,9 +118,11 @@ deploy-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
   script:
     - .ci/deploy-image.sh
   variables:
+    ARTIFACT_PREFIX: "{{ combo.device }}_{{ combo.ui }}_{{ combo.release }}"
+    DEPLOY_DIR: "{{ combo.device }}_{{ combo.ui }}_{{ combo.release }}"
     DEVICE: "{{ combo.device }}"
-    UI: "{{ combo.ui }}"
     RELEASE: "{{ combo.release }}"
+    UI: "{{ combo.ui }}"
 
 {% endfor %}
 {% endfor %}
