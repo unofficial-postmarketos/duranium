@@ -28,6 +28,42 @@ determine-version:
     paths:
       - mkosi.version
 
+.build-common:
+  image: alpine:edge
+  environment: build-image
+  before_script:
+    - apk upgrade -a
+    # mkosi is in testing repo
+    - echo "https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
+    - |
+      apk add bash \
+              curl \
+              distribution-gpg-keys \
+              git \
+              merge-usr \
+              mkosi \
+              python3
+
+    - |
+      # meow: https://gitlab.alpinelinux.org/postmarketOS/merge-usr/-/issues/5
+      wget https://dl-cdn.alpinelinux.org/alpine/v3.23/main/$ARCH/merge-usr-1.0.3-r0.apk >/dev/null 2>&1
+      apk -q add merge-usr-1.0.3-r0.apk
+      merge-usr >/dev/null 2>&1 || :
+      rm merge-usr-1.0.3-r0.apk
+
+    # convert to pmOS
+    - ln -sf /usr/share/distribution-gpg-keys/postmarketos/build.postmarketos.org.rsa.pub /etc/apk/keys
+    - echo "http://mirror.postmarketos.org/postmarketos/extra-repos/systemd/main" >> /etc/apk/repositories
+    - echo "http://mirror.postmarketos.org/postmarketos/main" >> /etc/apk/repositories
+    - apk add postmarketos-base-systemd
+    - apk add postmarketos-base
+
+    # Install TEST keys for verity partition signing
+    # FIXME: this is obviously not secure
+    - cp "$MKOSI_KEY" mkosi.key
+    - cp "$MKOSI_CRT" mkosi.crt
+    - chmod 600 mkosi.key
+
 {% for arch, combos in image_combos.items() %}
 build-packages-{{ arch }}:
   stage: build-packages
@@ -53,50 +89,16 @@ build-packages-{{ arch }}:
 {% for combo in combos %}
 build-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
   stage: build-image
-  image: alpine:edge
-  environment: build-image
+  extends: .build-common
   tags:
     - {{ arch }}
   needs:
     - determine-version
     - build-packages-{{ arch }}
-  before_script:
-    - apk upgrade -a
-    # mkosi is in testing repo
-    - echo "https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
-    - |
-      apk add bash \
-              curl \
-              distribution-gpg-keys \
-              git \
-              merge-usr \
-              mkosi \
-              python3
-
-    - |
-      # meow: https://gitlab.alpinelinux.org/postmarketOS/merge-usr/-/issues/5
-      wget https://dl-cdn.alpinelinux.org/alpine/v3.23/main/{{ arch }}/merge-usr-1.0.3-r0.apk >/dev/null 2>&1
-      apk -q add merge-usr-1.0.3-r0.apk
-      merge-usr >/dev/null 2>&1 || :
-      rm merge-usr-1.0.3-r0.apk
-
-    # convert to pmOS
-    - ln -sf /usr/share/distribution-gpg-keys/postmarketos/build.postmarketos.org.rsa.pub /etc/apk/keys
-    - echo "http://mirror.postmarketos.org/postmarketos/extra-repos/systemd/main" >> /etc/apk/repositories
-    - echo "http://mirror.postmarketos.org/postmarketos/main" >> /etc/apk/repositories
-    - apk add postmarketos-base-systemd
-    - apk add postmarketos-base
-
+  script:
     # Generate image ID for this device+ui+release combo
     - export IMAGE_ID="${DEVICE}_${UI}_${RELEASE}"
 
-    # Install TEST keys for verity partition signing
-    # FIXME: this is obviously not secure
-    - cp "$MKOSI_KEY" mkosi.key
-    - cp "$MKOSI_CRT" mkosi.crt
-    - chmod 600 mkosi.key
-
-  script:
     # Note: set workspace dir in /builds so that mkosi doesn't try to work
     # across multiple devices (e.g. / which is overlayfs)
     - |
@@ -113,6 +115,7 @@ build-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
       - mkosi.output/*/SHA256SUMS
       - mkosi.version
   variables:
+    ARCH: "{{ arch }}"
     DEVICE: "{{ combo.device }}"
     UI: "{{ combo.ui }}"
     RELEASE: "{{ combo.release }}"
