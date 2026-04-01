@@ -64,6 +64,18 @@ determine-version:
     - cp "$MKOSI_CRT" mkosi.crt
     - chmod 600 mkosi.key
 
+.deploy-common:
+  image: alpine:edge
+  environment: deploy
+  before_script:
+    - apk add gnupg openssh-client rsync
+    - |
+      mkdir -p "$HOME"/.ssh
+      echo "$SSH_HOST_KEY" > "$HOME"/.ssh/known_hosts
+      echo "$SSH_PRIVATE_KEY" > "$HOME"/.ssh/id_ed25519
+      chmod 600 "$HOME"/.ssh/id_ed25519
+    - gpg --import "$SYSUPDATE_PRIVATE_KEY"
+
 {% for arch, combos in image_combos.items() %}
 build-packages-{{ arch }}:
   stage: build-packages
@@ -122,19 +134,10 @@ build-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
 
 deploy-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
   stage: deploy-image
-  environment: deploy
-  image: alpine:edge
+  extends: .deploy-common
   resource_group: manifest-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}
   needs:
     - build-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}
-  before_script:
-    - apk add gnupg openssh-client rsync
-    - |
-      mkdir -p "$HOME"/.ssh
-      echo "$SSH_HOST_KEY" > "$HOME"/.ssh/known_hosts
-      echo "$SSH_PRIVATE_KEY" > "$HOME"/.ssh/id_ed25519
-      chmod 600 "$HOME"/.ssh/id_ed25519
-    - gpg --import "$SYSUPDATE_PRIVATE_KEY"
 
   script:
     - .ci/deploy-image.sh
