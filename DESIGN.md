@@ -188,6 +188,7 @@ Image files (except the UKI) will be compressed to save space on the server and 
 An example layout might look something like this:
 
 ```
+mkosi.version
 qemu-aarch64_console_edge/
 ├── qemu-aarch64_console_edge_25081111.efi
 ├── qemu-aarch64_console_edge_25081111.usr-arm64-verity-sig.e57b459d4a3f4260805fb3481f99b1de.raw.xz
@@ -209,6 +210,10 @@ pine64-pinephonepro_phosh_edge/
 ```
 
 A mkosi profile, `compressed`, will automatically compress the usr+verity partitions and generate a SHA256SUMs file with these artifacts listed in it that can be appended to an existing manifest on the HTTP server when the new artifacts are deployed to it.
+
+### Pipeline and Versioning
+
+All image builds within a single CI pipeline share the same `IMAGE_VERSION`. A global `mkosi.version` file on the server tracks the current version. After package builds succeed, a `determine-version` job fetches this file, runs `mkosi bump`, and writes it back immediately to claim the version. A CI resource group serializes this job across concurrent pipelines to prevent collisions. The resulting version is passed as an artifact to all downstream build jobs.
 
 ## Booting
 
