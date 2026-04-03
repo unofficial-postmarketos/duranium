@@ -8,6 +8,9 @@ stages:
   - build-image
   - deploy-image
 
+variables:
+  REMOTE_BASE: "{{ remote_base }}"
+
 determine-version:
   stage: determine-version
   environment: deploy
