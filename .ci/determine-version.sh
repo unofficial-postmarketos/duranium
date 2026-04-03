@@ -2,7 +2,7 @@
 # Get version file from server, bump it, then push it back
 set -e
 
-REMOTE_VERSION="/var/www/duranium.postmarketos.org/images/mkosi.version"
+REMOTE_VERSION="$REMOTE_BASE/mkosi.version"
 
 # fetch current version from server, or start fresh
 scp -P "$SSH_PORT" "$SSH_HOST:$REMOTE_VERSION" mkosi.version || true
