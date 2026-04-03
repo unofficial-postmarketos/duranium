@@ -11,8 +11,8 @@
 set -e
 
 # Download existing manifest
-scp -P "$SSH_PORT" "$SSH_HOST:/var/www/duranium.postmarketos.org/images/$DEPLOY_DIR/SHA256SUMS" SHA256SUMS.old || touch SHA256SUMS.old
-scp -P "$SSH_PORT" "$SSH_HOST:/var/www/duranium.postmarketos.org/images/$DEPLOY_DIR/SHA256SUMS.gpg" SHA256SUMS.old.gpg || true
+scp -P "$SSH_PORT" "$SSH_HOST:$REMOTE_BASE/$DEPLOY_DIR/SHA256SUMS" SHA256SUMS.old || touch SHA256SUMS.old
+scp -P "$SSH_PORT" "$SSH_HOST:$REMOTE_BASE/$DEPLOY_DIR/SHA256SUMS.gpg" SHA256SUMS.old.gpg || true
 
 # Verify existing manifest if signature exists
 if [ -f SHA256SUMS.old.gpg ]; then gpg --verify SHA256SUMS.old.gpg SHA256SUMS.old; fi
@@ -30,7 +30,7 @@ if [ -n "$versions" ]; then
 			files=$(grep " ${ARTIFACT_PREFIX}_${version}\." SHA256SUMS.old | awk '{print $2}')
 			# delete from server
 			for f in $files; do
-				ssh -p "$SSH_PORT" "$SSH_HOST" "rm -f /var/www/duranium.postmarketos.org/images/$DEPLOY_DIR/$f"
+				ssh -p "$SSH_PORT" "$SSH_HOST" "rm -f $REMOTE_BASE/$DEPLOY_DIR/$f"
 			done
 			# remove from manifest
 			sed -i "/ ${ARTIFACT_PREFIX}_${version}\./d" SHA256SUMS.old
@@ -46,13 +46,13 @@ cat SHA256SUMS.new SHA256SUMS.old > SHA256SUMS
 gpg --detach-sign --armor -o SHA256SUMS.gpg SHA256SUMS
 
 # Create remote directory
-ssh -p "$SSH_PORT" "$SSH_HOST" "mkdir -p /var/www/duranium.postmarketos.org/images/$DEPLOY_DIR"
+ssh -p "$SSH_PORT" "$SSH_HOST" "mkdir -p $REMOTE_BASE/$DEPLOY_DIR"
 
 # Upload images
-rsync -hrvz -e "ssh -p $SSH_PORT" mkosi.output/*/"${ARTIFACT_PREFIX}"_*.* "$SSH_HOST:/var/www/duranium.postmarketos.org/images/$DEPLOY_DIR/"
+rsync -hrvz -e "ssh -p $SSH_PORT" mkosi.output/*/"${ARTIFACT_PREFIX}"_*.* "$SSH_HOST:$REMOTE_BASE/$DEPLOY_DIR/"
 
 # Upload manifest
-rsync -hrvz -e "ssh -p $SSH_PORT" SHA256SUMS SHA256SUMS.gpg "$SSH_HOST:/var/www/duranium.postmarketos.org/images/$DEPLOY_DIR/"
+rsync -hrvz -e "ssh -p $SSH_PORT" SHA256SUMS SHA256SUMS.gpg "$SSH_HOST:$REMOTE_BASE/$DEPLOY_DIR/"
 
 # Generate and upload latest.json (OS images only)
 if [ -n "$DEVICE" ]; then
@@ -70,5 +70,5 @@ if [ -n "$DEVICE" ]; then
   "sha256": "$sha256"
 }
 EOF
-	rsync -hrvz -e "ssh -p $SSH_PORT" latest.json "$SSH_HOST:/var/www/duranium.postmarketos.org/images/$DEPLOY_DIR/"
+	rsync -hrvz -e "ssh -p $SSH_PORT" latest.json "$SSH_HOST:$REMOTE_BASE/$DEPLOY_DIR/"
 fi
