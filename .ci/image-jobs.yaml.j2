@@ -89,7 +89,7 @@ build-packages-{{ arch }}:
     - apk add curl
     - "echo '140.211.167.182 gitlab.postmarketos.org' >> /etc/hosts"
     - curl -4fsSL "https://gitlab.postmarketos.org/postmarketOS/ci-common/-/raw/main/install_pmbootstrap.sh" | sh
-    - su pmos -c "cd ~/.local/var/pmbootstrap/cache_git/pmaports && git checkout craftyguy/duranium-support"
+    - su pmos -c "cd ~/.local/var/pmbootstrap/cache_git/pmaports && git checkout duranium/staging"
   script:
     - su pmos -c "cd ~/.local/var/pmbootstrap/cache_git/pmaports && ./.ci/build-{{ arch }}.sh"
     - mkdir -p packages
