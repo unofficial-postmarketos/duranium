@@ -21,3 +21,13 @@ IMAGE_COMBOS = {
         {"device": "google-x64cros", "ui": "plasma-desktop", "release": "edge"},
     ],
 }
+
+# subset of combos to build from the staging branch
+STAGING_IMAGE_COMBOS = {
+    "aarch64": [
+        {"device": "lenovo-21bx", "ui": "gnome", "release": "edge"},
+    ],
+    "x86_64": [
+        {"device": "generic-x86_64", "ui": "gnome", "release": "edge"},
+    ],
+}
