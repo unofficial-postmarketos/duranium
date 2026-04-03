@@ -27,5 +27,7 @@ else:
     sys.exit(1)
 
 template = Template(Path(sys.argv[1]).read_text())
-output = template.render(image_combos=image_combos, remote_base=remote_base)
+output = template.render(branch=branch,
+                         image_combos=image_combos,
+                         remote_base=remote_base)
 Path(sys.argv[2]).write_text(output)

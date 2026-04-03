@@ -80,6 +80,7 @@ determine-version:
     - gpg --import "$SYSUPDATE_PRIVATE_KEY"
 
 {% for arch, combos in image_combos.items() %}
+{% if branch == "staging" %}
 build-packages-{{ arch }}:
   stage: build-packages
   image: alpine:edge
@@ -100,6 +101,7 @@ build-packages-{{ arch }}:
       - packages/
   variables:
     ARCH: "{{ arch }}"
+{% endif %}
 
 {% for combo in combos %}
 build-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
@@ -109,7 +111,9 @@ build-image-{{ combo.device }}-{{ combo.ui }}-{{ combo.release }}:
     - {{ arch }}
   needs:
     - determine-version
+{% if branch == "staging" %}
     - build-packages-{{ arch }}
+{% endif %}
   script:
     # Generate image ID for this device+ui+release combo
     - export IMAGE_ID="${DEVICE}_${UI}_${RELEASE}"
