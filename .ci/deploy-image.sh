@@ -8,7 +8,11 @@
 #   UI: ui, e.g. phosh
 #   RELEASE: release, e.g. edge
 #
-set -e
+set -eu
+
+DEVICE="${DEVICE:-}"
+RELEASE="${RELEASE:-}"
+UI="${UI:-}"
 
 # Download existing manifest
 scp -P "$SSH_PORT" "$SSH_HOST:$REMOTE_BASE/$DEPLOY_DIR/SHA256SUMS" SHA256SUMS.old || touch SHA256SUMS.old

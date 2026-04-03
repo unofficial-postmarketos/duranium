@@ -1,6 +1,6 @@
 #!/bin/sh
 # Get version file from server, bump it, then push it back
-set -e
+set -eu
 
 REMOTE_VERSION="$REMOTE_BASE/mkosi.version"
 
