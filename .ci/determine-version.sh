@@ -9,5 +9,8 @@ scp -P "$SSH_PORT" "$SSH_HOST:$REMOTE_VERSION" mkosi.version || true
 
 mkosi bump
 
+# create remote directory
+ssh -p "$SSH_PORT" "$SSH_HOST" "mkdir -p $REMOTE_BASE"
+
 # write back immediately to claim this version
 scp -P "$SSH_PORT" mkosi.version "$SSH_HOST:$REMOTE_VERSION"
